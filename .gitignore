@@ -1,0 +1,73 @@
+# 👉 macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# 🧰 Xcode-related files
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+
+# Xcode user/project data
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+!default.pbxuser
+!default.mode1v3
+xcuserdata/
+
+# Workspace settings and schemes
+!*.xcworkspace/contents.xcworkspacedata
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.xcworkspace/xcshareddata/*.xccheckout
+*.xcworkspace/xcshareddata/*.xcscmblueprint
+
+# Obj‑C / Swift specific
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# 🌐 Package managers & dependencies
+# Uncomment if you're using them
+# Packages/
+# Package.resolved
+.build/
+# CocoaPods
+# Pods/
+# Carthage
+Carthage/Build/
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# 🔧 Intermediate and logs
+*.o
+*.log
+*.tmp
+*.bak
+*.swp
+*~.nib
+
+# 🗄 Archives
+*.xcarchive
+
+# 🚫 Ignore compiled .saver bundle (only include binary in Resources)
+*.saver/
+
+# ✅ Keep binary in Resources/ so this is fine:
+!MyBonsaiSaver.saver/Contents/Resources/cbonsai
+
+# If you have a scripts output folder, ignore it
+bin/
