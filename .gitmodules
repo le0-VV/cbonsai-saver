@@ -1,0 +1,3 @@
+[submodule "cbonsai-source"]
+	path = cbonsai-source
+	url = https://gitlab.com/jallbrit/cbonsai.git
