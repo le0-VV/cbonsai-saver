@@ -1,0 +1,4 @@
+- [x] Search Brick memory for existing project context.
+- [x] Configure Brick semantic retrieval for `http://localhost:8745/v1`.
+- [x] Rebuild and verify Brick search.
+- [x] Review the resulting repository changes.

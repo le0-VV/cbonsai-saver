@@ -1,0 +1,35 @@
+{
+  "body": "Use Brick conflict reports to understand memory merge cases that require human review.",
+  "created_at": "2026-05-24T00:00:00Z",
+  "evidence": [
+    {
+      "kind": "example",
+      "text": "brick conflicts list and export expose generated merge review reports."
+    }
+  ],
+  "fields": {
+    "prerequisites": [
+      "A Brick merge-driver conflict report exists under .agents/brick/conflicts/."
+    ],
+    "steps": [
+      "Run ./brick conflicts list.",
+      "Export the relevant report with ./brick conflicts export <id>.",
+      "Compare base, ours, and theirs entries before proposing a resolution."
+    ],
+    "verify": "The proposed resolution preserves evidence and requires human approval before writing durable memory."
+  },
+  "id": "01JX3Y1Y8H6TR4Y3Q38K1W9P2D",
+  "source": {
+    "kind": "example",
+    "ref": "Brick v1 examples"
+  },
+  "status": "active",
+  "tags": [
+    "brick",
+    "merge",
+    "review"
+  ],
+  "title": "Investigate Brick merge conflict reports",
+  "type": "skill",
+  "updated_at": "2026-05-24T00:00:00Z"
+}

@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Brick LLM Memory Ingest Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "reason",
+    "questions",
+    "candidate"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "add",
+        "clarify",
+        "reject"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short explanation of why this action was chosen."
+    },
+    "questions": {
+      "type": "array",
+      "description": "Questions to ask the user when action is clarify; empty otherwise.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "maxItems": 3
+    },
+    "candidate": {
+      "description": "Brick memory-add candidate when action is add; null for clarify or reject.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "type",
+            "tags",
+            "body",
+            "source",
+            "evidence",
+            "confirm_public"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "decision",
+                "command",
+                "routine",
+                "skill",
+                "preference",
+                "fact",
+                "incident",
+                "pattern",
+                "task",
+                "policy"
+              ]
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 8
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "description": "One concise standalone canonical memory statement, not raw transcript."
+            },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "ref"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "conversation",
+                    "work_summary",
+                    "file",
+                    "commit",
+                    "pull_request",
+                    "issue",
+                    "manual"
+                  ]
+                },
+                "ref": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "text"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "quote",
+                      "file_excerpt",
+                      "work_summary",
+                      "commit",
+                      "pull_request",
+                      "issue",
+                      "manual"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "string"
+                  }
+                }
+              },
+              "minItems": 1,
+              "maxItems": 5
+            },
+            "confirm_public": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

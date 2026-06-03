@@ -1,0 +1,24 @@
+{
+  "body": "Agents working in a Brick-enabled repository should search Brick memory before relying on assumptions about project preferences or prior decisions.",
+  "created_at": "2026-05-24T00:00:00Z",
+  "evidence": [
+    {
+      "kind": "example",
+      "text": "Brick agent instructions require memory search before relying on assumptions."
+    }
+  ],
+  "id": "01JX3Y1Y8H6TR4Y3Q38K1W9P2A",
+  "source": {
+    "kind": "example",
+    "ref": "Brick v1 examples"
+  },
+  "status": "active",
+  "tags": [
+    "brick",
+    "retrieval",
+    "agent-workflow"
+  ],
+  "title": "Use Brick memory search before assuming project context",
+  "type": "decision",
+  "updated_at": "2026-05-24T00:00:00Z"
+}

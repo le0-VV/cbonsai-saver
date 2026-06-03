@@ -1,0 +1,7 @@
+{
+  "embedding": {
+    "url": "http://127.0.0.1:1234/v1",
+    "model": "text-embedding-model",
+    "api_key_env": "BRICK_EMBEDDING_API_KEY"
+  }
+}

@@ -71,3 +71,11 @@ fastlane/test_output
 
 # If you have a scripts output folder, ignore it
 bin/
+!.agents/brick/bin/
+!.agents/brick/bin/brick
+.agents/brick/.venv/
+.agents/brick/index/
+.agents/brick/conflicts/
+.agents/brick/config.local.json
+__pycache__/
+*.pyc

@@ -1,0 +1,19 @@
+{
+  "body": "This candidate demonstrates unsafe input and should be blocked: api_key = sk_example_not_a_real_secret_123456",
+  "evidence": [
+    {
+      "kind": "example",
+      "text": "Brick blocks likely credentials before writing durable memory."
+    }
+  ],
+  "source": {
+    "kind": "example",
+    "ref": "Brick v1 unsafe example"
+  },
+  "tags": [
+    "brick",
+    "safety"
+  ],
+  "title": "Blocked unsafe memory example",
+  "type": "decision"
+}

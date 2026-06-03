@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+import os
+from pathlib import Path
+import sys
+
+
+def _ensure_loopback_no_proxy() -> None:
+    loopback_hosts = ("localhost", "127.0.0.1", "::1")
+    for key in ("NO_PROXY", "no_proxy"):
+        existing = [
+            value.strip()
+            for value in os.environ.get(key, "").split(",")
+            if value.strip()
+        ]
+        merged = [*existing]
+        for host in loopback_hosts:
+            if host not in merged:
+                merged.append(host)
+        os.environ[key] = ",".join(merged)
+
+
+def _maybe_reexec_venv(brick_root: Path) -> None:
+    if os.environ.get("BRICK_NO_VENV_REEXEC"):
+        return
+    if sys.argv[1:2] == ["setup"]:
+        return
+    venv_python = brick_root / ".venv" / (
+        "Scripts/python.exe" if os.name == "nt" else "bin/python"
+    )
+    if not venv_python.exists():
+        return
+    if Path(sys.executable).resolve() == venv_python.resolve():
+        return
+    env = os.environ.copy()
+    env["BRICK_NO_VENV_REEXEC"] = "1"
+    os.execve(
+        str(venv_python),
+        [str(venv_python), str(Path(__file__).resolve()), *sys.argv[1:]],
+        env,
+    )
+
+
+def _bootstrap() -> None:
+    brick_root = Path(__file__).resolve().parents[1]
+    _ensure_loopback_no_proxy()
+    _maybe_reexec_venv(brick_root)
+    src = brick_root / "src"
+    if not src.is_dir():
+        print(
+            "brick: missing `.agents/brick/src`; re-run the Brick installer "
+            "and `./brick setup`.",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    sys.path.insert(0, str(src))
+
+
+_bootstrap()
+
+try:
+    from brick.cli import main
+except ModuleNotFoundError as exc:
+    print(
+        "brick: missing Python module or dependency "
+        f"`{exc.name}`; run `./brick setup` to repair Brick dependencies.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2) from exc
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

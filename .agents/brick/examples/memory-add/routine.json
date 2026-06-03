@@ -1,0 +1,36 @@
+{
+  "body": "Capture durable project context through Brick instead of hand-editing canonical memory files.",
+  "created_at": "2026-05-24T00:00:00Z",
+  "evidence": [
+    {
+      "kind": "example",
+      "text": "Agents should route memory writes through Brick commands."
+    }
+  ],
+  "fields": {
+    "prerequisites": [
+      "The candidate contains no secrets or unconfirmed PII.",
+      "The memory has concrete evidence."
+    ],
+    "steps": [
+      "Search existing memory for related context.",
+      "Prepare a JSON memory candidate with source and evidence.",
+      "Run ./brick memory add using JSON stdin.",
+      "Run ./brick rebuild after the memory is accepted."
+    ],
+    "verify": "brick memory validate returns ok for the written memory file."
+  },
+  "id": "01JX3Y1Y8H6TR4Y3Q38K1W9P2C",
+  "source": {
+    "kind": "example",
+    "ref": "Brick v1 examples"
+  },
+  "status": "active",
+  "tags": [
+    "brick",
+    "agent-workflow"
+  ],
+  "title": "Add memory during agent work",
+  "type": "routine",
+  "updated_at": "2026-05-24T00:00:00Z"
+}
