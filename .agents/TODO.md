@@ -1,4 +1,7 @@
-- [x] Search Brick memory for existing project context.
-- [x] Configure Brick semantic retrieval for `http://localhost:8745/v1`.
-- [x] Rebuild and verify Brick search.
-- [x] Review the resulting repository changes.
+- [x] Search Brick memory and record relevant repo instructions.
+- [x] Inspect the existing project structure, screensaver implementation, and build/test setup.
+- [x] Design the lightweight cbonsai execution path and macOS settings parameter flow.
+- [x] Implement the screensaver changes with narrow diffs.
+- [x] Add or update tests for the new behavior.
+- [x] Verify the build/tests and review the final diff.
+- [x] Commit the completed logical unit with the required author format.

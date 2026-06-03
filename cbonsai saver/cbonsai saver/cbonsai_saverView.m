@@ -6,6 +6,647 @@
 //
 
 #import "cbonsai_saverView.h"
+#import "CBCommandLine.h"
+
+#import <dispatch/dispatch.h>
+#import <errno.h>
+#import <fcntl.h>
+#import <signal.h>
+#import <stdlib.h>
+#import <string.h>
+#import <sys/ioctl.h>
+#import <sys/wait.h>
+#import <unistd.h>
+#import <util.h>
+
+static NSString * const CBSettingsModuleName = @"wang.leonard.cbonsai-saver";
+static NSString * const CBExecutablePathKey = @"executablePath";
+static NSString * const CBArgumentStringKey = @"argumentString";
+static NSString * const CBFontSizeKey = @"fontSize";
+static const CGFloat CBDefaultFontSize = 14.0;
+static const NSInteger CBDefaultForegroundColor = 7;
+static const NSInteger CBDefaultBackgroundColor = -1;
+
+typedef struct {
+    unichar character;
+    NSInteger foregroundColor;
+    NSInteger backgroundColor;
+    BOOL bold;
+} CBTerminalCell;
+
+static CBTerminalCell CBTerminalDefaultCell(void)
+{
+    CBTerminalCell cell;
+    cell.character = ' ';
+    cell.foregroundColor = CBDefaultForegroundColor;
+    cell.backgroundColor = CBDefaultBackgroundColor;
+    cell.bold = NO;
+    return cell;
+}
+
+static NSColor *CBColorForANSIIndex(NSInteger index)
+{
+    static NSArray<NSColor *> *baseColors;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        baseColors = @[
+            [NSColor colorWithCalibratedRed:0.00 green:0.00 blue:0.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.80 green:0.00 blue:0.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.00 green:0.55 blue:0.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.80 green:0.55 blue:0.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.00 green:0.00 blue:0.80 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.80 green:0.00 blue:0.80 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.00 green:0.55 blue:0.80 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.75 green:0.75 blue:0.75 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.35 green:0.35 blue:0.35 alpha:1.0],
+            [NSColor colorWithCalibratedRed:1.00 green:0.20 blue:0.20 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.20 green:1.00 blue:0.20 alpha:1.0],
+            [NSColor colorWithCalibratedRed:1.00 green:1.00 blue:0.20 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.20 green:0.20 blue:1.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:1.00 green:0.20 blue:1.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:0.20 green:1.00 blue:1.00 alpha:1.0],
+            [NSColor colorWithCalibratedRed:1.00 green:1.00 blue:1.00 alpha:1.0],
+        ];
+    });
+
+    if (index < 0) {
+        return [NSColor blackColor];
+    }
+
+    if (index < (NSInteger)baseColors.count) {
+        return baseColors[(NSUInteger)index];
+    }
+
+    if (index >= 16 && index <= 231) {
+        NSInteger cubeIndex = index - 16;
+        NSInteger redIndex = cubeIndex / 36;
+        NSInteger greenIndex = (cubeIndex / 6) % 6;
+        NSInteger blueIndex = cubeIndex % 6;
+        CGFloat red = (redIndex == 0) ? 0.0 : (CGFloat)(55 + redIndex * 40) / 255.0;
+        CGFloat green = (greenIndex == 0) ? 0.0 : (CGFloat)(55 + greenIndex * 40) / 255.0;
+        CGFloat blue = (blueIndex == 0) ? 0.0 : (CGFloat)(55 + blueIndex * 40) / 255.0;
+        return [NSColor colorWithCalibratedRed:red green:green blue:blue alpha:1.0];
+    }
+
+    if (index >= 232 && index <= 255) {
+        CGFloat value = (CGFloat)(8 + (index - 232) * 10) / 255.0;
+        return [NSColor colorWithCalibratedWhite:value alpha:1.0];
+    }
+
+    return [NSColor whiteColor];
+}
+
+static NSUInteger CBParameterAt(NSArray<NSNumber *> *parameters, NSUInteger index, NSUInteger defaultValue)
+{
+    if (index >= parameters.count) {
+        return defaultValue;
+    }
+    return parameters[index].unsignedIntegerValue;
+}
+
+static char **CBCStringArrayFromStrings(NSArray<NSString *> *strings)
+{
+    char **result = calloc(strings.count + 1, sizeof(char *));
+    if (result == NULL) {
+        return NULL;
+    }
+
+    for (NSUInteger index = 0; index < strings.count; index++) {
+        result[index] = strdup(strings[index].UTF8String);
+        if (result[index] == NULL) {
+            for (NSUInteger cleanupIndex = 0; cleanupIndex < index; cleanupIndex++) {
+                free(result[cleanupIndex]);
+            }
+            free(result);
+            return NULL;
+        }
+    }
+
+    result[strings.count] = NULL;
+    return result;
+}
+
+static void CBFreeCStringArray(char **strings)
+{
+    if (strings == NULL) {
+        return;
+    }
+
+    for (NSUInteger index = 0; strings[index] != NULL; index++) {
+        free(strings[index]);
+    }
+    free(strings);
+}
+
+static NSArray<NSNumber *> *CBParametersFromCSIString(NSString *string, BOOL *isPrivate)
+{
+    NSString *parameters = string;
+    if ([parameters hasPrefix:@"?"]) {
+        if (isPrivate != NULL) {
+            *isPrivate = YES;
+        }
+        parameters = [parameters substringFromIndex:1];
+    } else if (isPrivate != NULL) {
+        *isPrivate = NO;
+    }
+
+    if (parameters.length == 0) {
+        return @[];
+    }
+
+    NSMutableArray<NSNumber *> *result = [NSMutableArray array];
+    for (NSString *component in [parameters componentsSeparatedByString:@";"]) {
+        if (component.length == 0) {
+            [result addObject:@0];
+        } else {
+            [result addObject:@(component.integerValue)];
+        }
+    }
+    return result;
+}
+
+typedef NS_ENUM(NSUInteger, CBParserState) {
+    CBParserStateGround,
+    CBParserStateEscape,
+    CBParserStateCSI,
+    CBParserStateCharset,
+};
+
+@interface CBTerminalBuffer : NSObject
+
+@property (nonatomic, readonly) NSUInteger columns;
+@property (nonatomic, readonly) NSUInteger rows;
+
+- (instancetype)initWithColumns:(NSUInteger)columns rows:(NSUInteger)rows;
+- (void)resizeToColumns:(NSUInteger)columns rows:(NSUInteger)rows;
+- (void)appendData:(NSData *)data;
+- (CBTerminalCell)cellAtColumn:(NSUInteger)column row:(NSUInteger)row;
+- (void)showStatusMessage:(NSString *)message;
+
+@end
+
+@implementation CBTerminalBuffer {
+    CBTerminalCell *_cells;
+    NSUInteger _columns;
+    NSUInteger _rows;
+    NSUInteger _cursorColumn;
+    NSUInteger _cursorRow;
+    NSUInteger _savedCursorColumn;
+    NSUInteger _savedCursorRow;
+    NSInteger _foregroundColor;
+    NSInteger _backgroundColor;
+    BOOL _bold;
+    CBParserState _parserState;
+    NSMutableString *_csiString;
+    NSMutableData *_utf8Bytes;
+    NSUInteger _expectedUTF8Length;
+}
+
+@synthesize columns = _columns;
+@synthesize rows = _rows;
+
+- (instancetype)initWithColumns:(NSUInteger)columns rows:(NSUInteger)rows
+{
+    self = [super init];
+    if (self) {
+        _columns = MAX((NSUInteger)1, columns);
+        _rows = MAX((NSUInteger)1, rows);
+        _cells = calloc(_columns * _rows, sizeof(CBTerminalCell));
+        if (_cells == NULL) {
+            return nil;
+        }
+        _foregroundColor = CBDefaultForegroundColor;
+        _backgroundColor = CBDefaultBackgroundColor;
+        _csiString = [NSMutableString string];
+        _utf8Bytes = [NSMutableData data];
+        [self fillCellsFromIndex:0 count:_columns * _rows];
+    }
+    return self;
+}
+
+- (void)dealloc
+{
+    free(_cells);
+}
+
+- (void)resizeToColumns:(NSUInteger)columns rows:(NSUInteger)rows
+{
+    columns = MAX((NSUInteger)1, columns);
+    rows = MAX((NSUInteger)1, rows);
+
+    if (columns == _columns && rows == _rows) {
+        return;
+    }
+
+    CBTerminalCell *newCells = calloc(columns * rows, sizeof(CBTerminalCell));
+    if (newCells == NULL) {
+        return;
+    }
+
+    for (NSUInteger index = 0; index < columns * rows; index++) {
+        newCells[index] = CBTerminalDefaultCell();
+    }
+
+    NSUInteger copyRows = MIN(_rows, rows);
+    NSUInteger copyColumns = MIN(_columns, columns);
+    for (NSUInteger row = 0; row < copyRows; row++) {
+        memcpy(newCells + row * columns, _cells + row * _columns, copyColumns * sizeof(CBTerminalCell));
+    }
+
+    free(_cells);
+    _cells = newCells;
+    _columns = columns;
+    _rows = rows;
+    _cursorColumn = MIN(_cursorColumn, _columns - 1);
+    _cursorRow = MIN(_cursorRow, _rows - 1);
+    _savedCursorColumn = MIN(_savedCursorColumn, _columns - 1);
+    _savedCursorRow = MIN(_savedCursorRow, _rows - 1);
+}
+
+- (void)appendData:(NSData *)data
+{
+    const unsigned char *bytes = data.bytes;
+    for (NSUInteger index = 0; index < data.length; index++) {
+        [self consumeByte:bytes[index]];
+    }
+}
+
+- (CBTerminalCell)cellAtColumn:(NSUInteger)column row:(NSUInteger)row
+{
+    if (column >= _columns || row >= _rows) {
+        return CBTerminalDefaultCell();
+    }
+    return _cells[row * _columns + column];
+}
+
+- (void)showStatusMessage:(NSString *)message
+{
+    [self clearAllCellsAndResetCursor:YES];
+    NSUInteger maxLength = MIN(message.length, _columns);
+    for (NSUInteger index = 0; index < maxLength; index++) {
+        CBTerminalCell cell = CBTerminalDefaultCell();
+        cell.character = [message characterAtIndex:index];
+        cell.foregroundColor = 9;
+        _cells[index] = cell;
+    }
+}
+
+- (void)consumeByte:(unsigned char)byte
+{
+    switch (_parserState) {
+        case CBParserStateGround:
+            [self consumeGroundByte:byte];
+            break;
+        case CBParserStateEscape:
+            [self consumeEscapeByte:byte];
+            break;
+        case CBParserStateCSI:
+            [self consumeCSIByte:byte];
+            break;
+        case CBParserStateCharset:
+            _parserState = CBParserStateGround;
+            break;
+    }
+}
+
+- (void)consumeGroundByte:(unsigned char)byte
+{
+    if (_expectedUTF8Length > 0) {
+        [self consumeUTF8ContinuationByte:byte];
+        return;
+    }
+
+    if (byte == 0x1B) {
+        _parserState = CBParserStateEscape;
+    } else if (byte == '\r') {
+        _cursorColumn = 0;
+    } else if (byte == '\n') {
+        [self moveCursorDownOneLine];
+    } else if (byte == '\b') {
+        if (_cursorColumn > 0) {
+            _cursorColumn--;
+        }
+    } else if (byte == '\t') {
+        NSUInteger targetColumn = MIN(_columns - 1, ((_cursorColumn / 8) + 1) * 8);
+        while (_cursorColumn < targetColumn) {
+            [self putCharacter:' '];
+        }
+    } else if (byte >= 0x20 && byte < 0x7F) {
+        [self putCharacter:(unichar)byte];
+    } else if (byte >= 0xC2 && byte <= 0xF4) {
+        [self startUTF8SequenceWithByte:byte];
+    }
+}
+
+- (void)consumeEscapeByte:(unsigned char)byte
+{
+    if (byte == '[') {
+        [_csiString setString:@""];
+        _parserState = CBParserStateCSI;
+    } else if (byte == '7') {
+        _savedCursorColumn = _cursorColumn;
+        _savedCursorRow = _cursorRow;
+        _parserState = CBParserStateGround;
+    } else if (byte == '8') {
+        _cursorColumn = MIN(_savedCursorColumn, _columns - 1);
+        _cursorRow = MIN(_savedCursorRow, _rows - 1);
+        _parserState = CBParserStateGround;
+    } else if (byte == 'c') {
+        [self clearAllCellsAndResetCursor:YES];
+        _parserState = CBParserStateGround;
+    } else if (byte == '(' || byte == ')') {
+        _parserState = CBParserStateCharset;
+    } else {
+        _parserState = CBParserStateGround;
+    }
+}
+
+- (void)consumeCSIByte:(unsigned char)byte
+{
+    if (byte >= 0x40 && byte <= 0x7E) {
+        [self handleCSIWithFinalByte:byte];
+        [_csiString setString:@""];
+        _parserState = CBParserStateGround;
+    } else {
+        [_csiString appendFormat:@"%c", byte];
+    }
+}
+
+- (void)handleCSIWithFinalByte:(unsigned char)byte
+{
+    BOOL privateSequence = NO;
+    NSArray<NSNumber *> *parameters = CBParametersFromCSIString(_csiString, &privateSequence);
+
+    switch (byte) {
+        case 'H':
+        case 'f':
+            [self moveCursorToRow:CBParameterAt(parameters, 0, 1) column:CBParameterAt(parameters, 1, 1)];
+            break;
+        case 'A':
+            _cursorRow -= MIN(_cursorRow, CBParameterAt(parameters, 0, 1));
+            break;
+        case 'B':
+            _cursorRow = MIN(_rows - 1, _cursorRow + CBParameterAt(parameters, 0, 1));
+            break;
+        case 'C':
+            _cursorColumn = MIN(_columns - 1, _cursorColumn + CBParameterAt(parameters, 0, 1));
+            break;
+        case 'D':
+            _cursorColumn -= MIN(_cursorColumn, CBParameterAt(parameters, 0, 1));
+            break;
+        case 'G':
+            [self moveCursorToColumn:CBParameterAt(parameters, 0, 1)];
+            break;
+        case 'd':
+            [self moveCursorToRow:CBParameterAt(parameters, 0, 1) column:_cursorColumn + 1];
+            break;
+        case 'J':
+            [self clearScreenWithMode:CBParameterAt(parameters, 0, 0)];
+            break;
+        case 'K':
+            [self clearLineWithMode:CBParameterAt(parameters, 0, 0)];
+            break;
+        case 'm':
+            [self applySGRParameters:parameters];
+            break;
+        case 's':
+            _savedCursorColumn = _cursorColumn;
+            _savedCursorRow = _cursorRow;
+            break;
+        case 'u':
+            _cursorColumn = MIN(_savedCursorColumn, _columns - 1);
+            _cursorRow = MIN(_savedCursorRow, _rows - 1);
+            break;
+        case 'h':
+        case 'l':
+            if (privateSequence && ([parameters containsObject:@1049] || [parameters containsObject:@47])) {
+                [self clearAllCellsAndResetCursor:YES];
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)startUTF8SequenceWithByte:(unsigned char)byte
+{
+    [_utf8Bytes setLength:0];
+    [_utf8Bytes appendBytes:&byte length:1];
+
+    if ((byte & 0xE0) == 0xC0) {
+        _expectedUTF8Length = 2;
+    } else if ((byte & 0xF0) == 0xE0) {
+        _expectedUTF8Length = 3;
+    } else {
+        _expectedUTF8Length = 4;
+    }
+}
+
+- (void)consumeUTF8ContinuationByte:(unsigned char)byte
+{
+    if ((byte & 0xC0) != 0x80) {
+        [_utf8Bytes setLength:0];
+        _expectedUTF8Length = 0;
+        [self putCharacter:'?'];
+        [self consumeGroundByte:byte];
+        return;
+    }
+
+    [_utf8Bytes appendBytes:&byte length:1];
+    if (_utf8Bytes.length < _expectedUTF8Length) {
+        return;
+    }
+
+    NSString *character = [[NSString alloc] initWithData:_utf8Bytes encoding:NSUTF8StringEncoding];
+    [self putCharacter:(character.length > 0) ? [character characterAtIndex:0] : '?'];
+    [_utf8Bytes setLength:0];
+    _expectedUTF8Length = 0;
+}
+
+- (void)putCharacter:(unichar)character
+{
+    if (_cursorColumn >= _columns) {
+        _cursorColumn = 0;
+        [self moveCursorDownOneLine];
+    }
+
+    CBTerminalCell cell;
+    cell.character = character;
+    cell.foregroundColor = _foregroundColor;
+    cell.backgroundColor = _backgroundColor;
+    cell.bold = _bold;
+    _cells[_cursorRow * _columns + _cursorColumn] = cell;
+
+    _cursorColumn++;
+    if (_cursorColumn >= _columns) {
+        _cursorColumn = 0;
+        [self moveCursorDownOneLine];
+    }
+}
+
+- (void)moveCursorDownOneLine
+{
+    if (_cursorRow + 1 < _rows) {
+        _cursorRow++;
+    } else {
+        [self scrollUpOneLine];
+    }
+}
+
+- (void)moveCursorToRow:(NSUInteger)row column:(NSUInteger)column
+{
+    _cursorRow = MIN((row > 0) ? row - 1 : 0, _rows - 1);
+    _cursorColumn = MIN((column > 0) ? column - 1 : 0, _columns - 1);
+}
+
+- (void)moveCursorToColumn:(NSUInteger)column
+{
+    _cursorColumn = MIN((column > 0) ? column - 1 : 0, _columns - 1);
+}
+
+- (void)scrollUpOneLine
+{
+    if (_rows <= 1) {
+        [self fillCellsFromIndex:0 count:_columns];
+        return;
+    }
+
+    memmove(_cells, _cells + _columns, (_rows - 1) * _columns * sizeof(CBTerminalCell));
+    [self fillCellsFromIndex:(_rows - 1) * _columns count:_columns];
+}
+
+- (void)clearAllCellsAndResetCursor:(BOOL)resetCursor
+{
+    [self fillCellsFromIndex:0 count:_columns * _rows];
+    if (resetCursor) {
+        _cursorColumn = 0;
+        _cursorRow = 0;
+        _foregroundColor = CBDefaultForegroundColor;
+        _backgroundColor = CBDefaultBackgroundColor;
+        _bold = NO;
+    }
+}
+
+- (void)clearScreenWithMode:(NSUInteger)mode
+{
+    if (mode == 2 || mode == 3) {
+        [self clearAllCellsAndResetCursor:NO];
+        return;
+    }
+
+    if (mode == 1) {
+        for (NSUInteger row = 0; row <= _cursorRow; row++) {
+            NSUInteger startColumn = 0;
+            NSUInteger endColumn = (row == _cursorRow) ? _cursorColumn : _columns - 1;
+            [self clearRow:row startColumn:startColumn endColumn:endColumn];
+        }
+        return;
+    }
+
+    for (NSUInteger row = _cursorRow; row < _rows; row++) {
+        NSUInteger startColumn = (row == _cursorRow) ? _cursorColumn : 0;
+        [self clearRow:row startColumn:startColumn endColumn:_columns - 1];
+    }
+}
+
+- (void)clearLineWithMode:(NSUInteger)mode
+{
+    if (mode == 2) {
+        [self clearRow:_cursorRow startColumn:0 endColumn:_columns - 1];
+    } else if (mode == 1) {
+        [self clearRow:_cursorRow startColumn:0 endColumn:_cursorColumn];
+    } else {
+        [self clearRow:_cursorRow startColumn:_cursorColumn endColumn:_columns - 1];
+    }
+}
+
+- (void)clearRow:(NSUInteger)row startColumn:(NSUInteger)startColumn endColumn:(NSUInteger)endColumn
+{
+    if (row >= _rows || startColumn >= _columns || endColumn >= _columns || startColumn > endColumn) {
+        return;
+    }
+    [self fillCellsFromIndex:row * _columns + startColumn count:endColumn - startColumn + 1];
+}
+
+- (void)fillCellsFromIndex:(NSUInteger)startIndex count:(NSUInteger)count
+{
+    CBTerminalCell defaultCell = CBTerminalDefaultCell();
+    for (NSUInteger index = startIndex; index < startIndex + count; index++) {
+        _cells[index] = defaultCell;
+    }
+}
+
+- (void)applySGRParameters:(NSArray<NSNumber *> *)parameters
+{
+    if (parameters.count == 0) {
+        [self resetAttributes];
+        return;
+    }
+
+    for (NSUInteger index = 0; index < parameters.count; index++) {
+        NSInteger value = parameters[index].integerValue;
+
+        if (value == 0) {
+            [self resetAttributes];
+        } else if (value == 1) {
+            _bold = YES;
+        } else if (value == 22) {
+            _bold = NO;
+        } else if (value >= 30 && value <= 37) {
+            _foregroundColor = value - 30;
+        } else if (value == 39) {
+            _foregroundColor = CBDefaultForegroundColor;
+        } else if (value >= 40 && value <= 47) {
+            _backgroundColor = value - 40;
+        } else if (value == 49) {
+            _backgroundColor = CBDefaultBackgroundColor;
+        } else if (value >= 90 && value <= 97) {
+            _foregroundColor = value - 90 + 8;
+        } else if (value >= 100 && value <= 107) {
+            _backgroundColor = value - 100 + 8;
+        } else if ((value == 38 || value == 48) && index + 2 < parameters.count && parameters[index + 1].integerValue == 5) {
+            NSInteger color = parameters[index + 2].integerValue;
+            if (color >= 0 && color <= 255) {
+                if (value == 38) {
+                    _foregroundColor = color;
+                } else {
+                    _backgroundColor = color;
+                }
+            }
+            index += 2;
+        } else if ((value == 38 || value == 48) && index + 4 < parameters.count && parameters[index + 1].integerValue == 2) {
+            index += 4;
+        }
+    }
+}
+
+- (void)resetAttributes
+{
+    _foregroundColor = CBDefaultForegroundColor;
+    _backgroundColor = CBDefaultBackgroundColor;
+    _bold = NO;
+}
+
+@end
+
+@interface cbonsai_saverView ()
+
+@property (nonatomic, strong) CBTerminalBuffer *terminalBuffer;
+@property (nonatomic, strong) NSFont *terminalFont;
+@property (nonatomic, strong) dispatch_queue_t readQueue;
+@property (nonatomic, strong) dispatch_source_t readSource;
+@property (nonatomic) CGFloat cellWidth;
+@property (nonatomic) CGFloat cellHeight;
+@property (nonatomic) int masterFileDescriptor;
+@property (nonatomic) pid_t childProcessIdentifier;
+@property (nonatomic) BOOL stoppingChildProcess;
+@property (nonatomic, strong) NSWindow *configurationSheet;
+@property (nonatomic, strong) NSTextField *executableField;
+@property (nonatomic, strong) NSTextField *argumentsField;
+@property (nonatomic, strong) NSTextField *fontSizeField;
+@property (nonatomic, strong) NSStepper *fontSizeStepper;
+
+@end
 
 @implementation cbonsai_saverView
 
@@ -13,39 +654,507 @@
 {
     self = [super initWithFrame:frame isPreview:isPreview];
     if (self) {
-        [self setAnimationTimeInterval:1/30.0];
+        _masterFileDescriptor = -1;
+        _childProcessIdentifier = -1;
+        _readQueue = dispatch_queue_create("wang.leonard.cbonsai-saver.pty", DISPATCH_QUEUE_SERIAL);
+        [self setAnimationTimeInterval:1.0 / 30.0];
+        [self registerDefaultSettings];
+        [self updateTerminalGeometry];
     }
     return self;
+}
+
+- (void)dealloc
+{
+    [self stopCbonsaiProcess];
+}
+
+- (BOOL)isFlipped
+{
+    return YES;
+}
+
+- (void)setFrameSize:(NSSize)newSize
+{
+    [super setFrameSize:newSize];
+    [self updateTerminalGeometry];
 }
 
 - (void)startAnimation
 {
     [super startAnimation];
+    [self updateTerminalGeometry];
+    [self startCbonsaiProcess];
 }
 
 - (void)stopAnimation
 {
+    [self stopCbonsaiProcess];
     [super stopAnimation];
 }
 
 - (void)drawRect:(NSRect)rect
 {
-    [super drawRect:rect];
+    [[NSColor blackColor] setFill];
+    NSRectFill(rect);
+
+    [self updateTerminalGeometry];
+    if (self.terminalBuffer == nil || self.cellWidth <= 0.0 || self.cellHeight <= 0.0) {
+        return;
+    }
+
+    CGFloat terminalWidth = (CGFloat)self.terminalBuffer.columns * self.cellWidth;
+    CGFloat terminalHeight = (CGFloat)self.terminalBuffer.rows * self.cellHeight;
+    CGFloat originX = floor((NSWidth(self.bounds) - terminalWidth) / 2.0);
+    CGFloat originY = floor((NSHeight(self.bounds) - terminalHeight) / 2.0);
+
+    for (NSUInteger row = 0; row < self.terminalBuffer.rows; row++) {
+        [self drawBackgroundsForRow:row originX:originX originY:originY];
+        [self drawTextForRow:row originX:originX originY:originY];
+    }
 }
 
 - (void)animateOneFrame
 {
-    return;
 }
 
 - (BOOL)hasConfigureSheet
 {
-    return NO;
+    return YES;
 }
 
-- (NSWindow*)configureSheet
+- (NSWindow *)configureSheet
 {
-    return nil;
+    if (self.configurationSheet == nil) {
+        self.configurationSheet = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 520, 188)
+                                                              styleMask:NSWindowStyleMaskTitled
+                                                                backing:NSBackingStoreBuffered
+                                                                  defer:NO];
+        self.configurationSheet.title = @"cbonsai screen saver";
+        [self buildConfigurationContent];
+    }
+
+    [self loadConfigurationFields];
+    return self.configurationSheet;
+}
+
+- (ScreenSaverDefaults *)screenSaverDefaults
+{
+    ScreenSaverDefaults *defaults = [ScreenSaverDefaults defaultsForModuleWithName:CBSettingsModuleName];
+    [defaults registerDefaults:@{
+        CBExecutablePathKey: CBDefaultExecutablePath(),
+        CBArgumentStringKey: CBDefaultArgumentString(),
+        CBFontSizeKey: @(CBDefaultFontSize),
+    }];
+    return defaults;
+}
+
+- (void)registerDefaultSettings
+{
+    (void)[self screenSaverDefaults];
+}
+
+- (NSString *)configuredExecutablePath
+{
+    NSString *path = [[self screenSaverDefaults] stringForKey:CBExecutablePathKey];
+    return (path.length > 0) ? path : CBDefaultExecutablePath();
+}
+
+- (NSString *)configuredArgumentString
+{
+    NSString *arguments = [[self screenSaverDefaults] stringForKey:CBArgumentStringKey];
+    return (arguments != nil) ? arguments : CBDefaultArgumentString();
+}
+
+- (CGFloat)configuredFontSize
+{
+    CGFloat fontSize = [[self screenSaverDefaults] doubleForKey:CBFontSizeKey];
+    if (fontSize < 8.0 || fontSize > 48.0) {
+        return CBDefaultFontSize;
+    }
+    return fontSize;
+}
+
+- (void)updateTerminalGeometry
+{
+    CGFloat fontSize = [self configuredFontSize];
+    if (self.terminalFont == nil || fabs(self.terminalFont.pointSize - fontSize) > 0.1) {
+        self.terminalFont = [NSFont userFixedPitchFontOfSize:fontSize];
+        if (self.terminalFont == nil) {
+            self.terminalFont = [NSFont monospacedSystemFontOfSize:fontSize weight:NSFontWeightRegular];
+        }
+        NSDictionary<NSAttributedStringKey, id> *attributes = @{NSFontAttributeName: self.terminalFont};
+        self.cellWidth = ceil([@"W" sizeWithAttributes:attributes].width);
+        self.cellHeight = ceil(self.terminalFont.ascender - self.terminalFont.descender + self.terminalFont.leading);
+    }
+
+    if (self.cellWidth <= 0.0 || self.cellHeight <= 0.0 || NSWidth(self.bounds) <= 0.0 || NSHeight(self.bounds) <= 0.0) {
+        return;
+    }
+
+    NSUInteger columns = MAX((NSUInteger)1, (NSUInteger)floor(NSWidth(self.bounds) / self.cellWidth));
+    NSUInteger rows = MAX((NSUInteger)1, (NSUInteger)floor(NSHeight(self.bounds) / self.cellHeight));
+
+    if (self.terminalBuffer == nil) {
+        self.terminalBuffer = [[CBTerminalBuffer alloc] initWithColumns:columns rows:rows];
+    } else {
+        [self.terminalBuffer resizeToColumns:columns rows:rows];
+    }
+
+    [self updatePtyWindowSize];
+}
+
+- (void)updatePtyWindowSize
+{
+    if (self.masterFileDescriptor < 0 || self.terminalBuffer == nil) {
+        return;
+    }
+
+    struct winsize size;
+    memset(&size, 0, sizeof(size));
+    size.ws_col = (unsigned short)self.terminalBuffer.columns;
+    size.ws_row = (unsigned short)self.terminalBuffer.rows;
+    size.ws_xpixel = (unsigned short)NSWidth(self.bounds);
+    size.ws_ypixel = (unsigned short)NSHeight(self.bounds);
+    ioctl(self.masterFileDescriptor, TIOCSWINSZ, &size);
+}
+
+- (void)startCbonsaiProcess
+{
+    if (self.childProcessIdentifier > 0 || self.terminalBuffer == nil) {
+        return;
+    }
+
+    NSString *executablePath = [self.configuredExecutablePath stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (executablePath.length == 0) {
+        [self.terminalBuffer showStatusMessage:@"cbonsai executable path is empty."];
+        [self setNeedsDisplay:YES];
+        return;
+    }
+
+    NSError *parseError = nil;
+    NSArray<NSString *> *arguments = CBParseArgumentString(self.configuredArgumentString, &parseError);
+    if (arguments == nil) {
+        [self.terminalBuffer showStatusMessage:parseError.localizedDescription];
+        [self setNeedsDisplay:YES];
+        return;
+    }
+
+    char **shellArgv = [self createShellArgvWithArguments:arguments];
+    char **shellEnvironment = [self createShellEnvironmentWithExecutablePath:executablePath];
+    if (shellArgv == NULL || shellEnvironment == NULL) {
+        CBFreeCStringArray(shellArgv);
+        CBFreeCStringArray(shellEnvironment);
+        [self.terminalBuffer showStatusMessage:@"Unable to allocate cbonsai launch arguments."];
+        [self setNeedsDisplay:YES];
+        return;
+    }
+
+    int masterFileDescriptor = -1;
+    struct winsize size;
+    memset(&size, 0, sizeof(size));
+    size.ws_col = (unsigned short)self.terminalBuffer.columns;
+    size.ws_row = (unsigned short)self.terminalBuffer.rows;
+    size.ws_xpixel = (unsigned short)NSWidth(self.bounds);
+    size.ws_ypixel = (unsigned short)NSHeight(self.bounds);
+
+    pid_t childPid = forkpty(&masterFileDescriptor, NULL, NULL, &size);
+    if (childPid < 0) {
+        CBFreeCStringArray(shellArgv);
+        CBFreeCStringArray(shellEnvironment);
+        [self.terminalBuffer showStatusMessage:[NSString stringWithFormat:@"forkpty failed: %s", strerror(errno)]];
+        [self setNeedsDisplay:YES];
+        return;
+    }
+
+    if (childPid == 0) {
+        execve("/bin/sh", shellArgv, shellEnvironment);
+        _exit(127);
+    }
+
+    CBFreeCStringArray(shellArgv);
+    CBFreeCStringArray(shellEnvironment);
+
+    fcntl(masterFileDescriptor, F_SETFL, fcntl(masterFileDescriptor, F_GETFL, 0) | O_NONBLOCK);
+    self.masterFileDescriptor = masterFileDescriptor;
+    self.childProcessIdentifier = childPid;
+    self.stoppingChildProcess = NO;
+    [self startReadingFromPty:masterFileDescriptor];
+}
+
+- (char **)createShellArgvWithArguments:(NSArray<NSString *> *)arguments
+{
+    NSMutableArray<NSString *> *shellArguments = [NSMutableArray arrayWithObjects:
+        @"sh",
+        @"-c",
+        @"exec \"$CBONSAI_EXECUTABLE\" \"$@\"",
+        @"cbonsai-saver",
+        nil];
+    [shellArguments addObjectsFromArray:arguments];
+    return CBCStringArrayFromStrings(shellArguments);
+}
+
+- (char **)createShellEnvironmentWithExecutablePath:(NSString *)executablePath
+{
+    NSDictionary<NSString *, NSString *> *processEnvironment = NSProcessInfo.processInfo.environment;
+    NSMutableArray<NSString *> *environment = [NSMutableArray arrayWithObjects:
+        [@"CBONSAI_EXECUTABLE=" stringByAppendingString:executablePath],
+        [@"PATH=" stringByAppendingString:CBDefaultEnvironmentPath()],
+        @"TERM=xterm-256color",
+        nil];
+
+    NSString *language = processEnvironment[@"LANG"];
+    [environment addObject:[@"LANG=" stringByAppendingString:(language.length > 0 ? language : @"en_US.UTF-8")]];
+
+    for (NSString *key in @[@"HOME", @"USER", @"LOGNAME", @"TMPDIR", @"XDG_CACHE_HOME"]) {
+        NSString *value = processEnvironment[key];
+        if (value.length > 0) {
+            [environment addObject:[NSString stringWithFormat:@"%@=%@", key, value]];
+        }
+    }
+
+    return CBCStringArrayFromStrings(environment);
+}
+
+- (void)startReadingFromPty:(int)fileDescriptor
+{
+    dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)fileDescriptor, 0, self.readQueue);
+    self.readSource = source;
+
+    __weak typeof(self) weakSelf = self;
+    dispatch_source_set_event_handler(source, ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (strongSelf == nil) {
+            return;
+        }
+
+        char buffer[4096];
+        while (YES) {
+            ssize_t byteCount = read(fileDescriptor, buffer, sizeof(buffer));
+            if (byteCount > 0) {
+                NSData *data = [NSData dataWithBytes:buffer length:(NSUInteger)byteCount];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [strongSelf.terminalBuffer appendData:data];
+                    [strongSelf setNeedsDisplay:YES];
+                });
+            } else if (byteCount == 0) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [strongSelf handleChildProcessExit];
+                });
+                break;
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                break;
+            } else {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [strongSelf handleChildProcessExit];
+                });
+                break;
+            }
+        }
+    });
+
+    dispatch_source_set_cancel_handler(source, ^{
+        close(fileDescriptor);
+    });
+
+    dispatch_resume(source);
+}
+
+- (void)handleChildProcessExit
+{
+    if (self.readSource != nil) {
+        dispatch_source_cancel(self.readSource);
+        self.readSource = nil;
+    }
+    self.masterFileDescriptor = -1;
+
+    pid_t childPid = self.childProcessIdentifier;
+    self.childProcessIdentifier = -1;
+    if (childPid > 0) {
+        int status = 0;
+        waitpid(childPid, &status, WNOHANG);
+    }
+
+    if (!self.stoppingChildProcess) {
+        [self.terminalBuffer showStatusMessage:@"cbonsai exited. Use --screensaver or -li for continuous output."];
+        [self setNeedsDisplay:YES];
+    }
+}
+
+- (void)stopCbonsaiProcess
+{
+    self.stoppingChildProcess = YES;
+
+    pid_t childPid = self.childProcessIdentifier;
+    self.childProcessIdentifier = -1;
+    if (childPid > 0) {
+        kill(childPid, SIGTERM);
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            int status = 0;
+            pid_t result = waitpid(childPid, &status, WNOHANG);
+            if (result == 0) {
+                kill(childPid, SIGKILL);
+                waitpid(childPid, &status, 0);
+            }
+        });
+    }
+
+    if (self.readSource != nil) {
+        dispatch_source_cancel(self.readSource);
+        self.readSource = nil;
+    } else if (self.masterFileDescriptor >= 0) {
+        close(self.masterFileDescriptor);
+    }
+    self.masterFileDescriptor = -1;
+}
+
+- (void)drawBackgroundsForRow:(NSUInteger)row originX:(CGFloat)originX originY:(CGFloat)originY
+{
+    NSUInteger column = 0;
+    while (column < self.terminalBuffer.columns) {
+        CBTerminalCell cell = [self.terminalBuffer cellAtColumn:column row:row];
+        NSInteger backgroundColor = cell.backgroundColor;
+        NSUInteger startColumn = column;
+        column++;
+        while (column < self.terminalBuffer.columns) {
+            CBTerminalCell nextCell = [self.terminalBuffer cellAtColumn:column row:row];
+            if (nextCell.backgroundColor != backgroundColor) {
+                break;
+            }
+            column++;
+        }
+
+        if (backgroundColor >= 0) {
+            [CBColorForANSIIndex(backgroundColor) setFill];
+            NSRectFill(NSMakeRect(originX + (CGFloat)startColumn * self.cellWidth,
+                                  originY + (CGFloat)row * self.cellHeight,
+                                  (CGFloat)(column - startColumn) * self.cellWidth,
+                                  self.cellHeight));
+        }
+    }
+}
+
+- (void)drawTextForRow:(NSUInteger)row originX:(CGFloat)originX originY:(CGFloat)originY
+{
+    NSUInteger column = 0;
+    while (column < self.terminalBuffer.columns) {
+        CBTerminalCell cell = [self.terminalBuffer cellAtColumn:column row:row];
+        if (cell.character == ' ') {
+            column++;
+            continue;
+        }
+
+        NSInteger foregroundColor = cell.foregroundColor;
+        BOOL bold = cell.bold;
+        NSUInteger startColumn = column;
+        NSMutableString *text = [NSMutableString string];
+
+        while (column < self.terminalBuffer.columns) {
+            CBTerminalCell nextCell = [self.terminalBuffer cellAtColumn:column row:row];
+            if (nextCell.foregroundColor != foregroundColor || nextCell.bold != bold) {
+                break;
+            }
+            [text appendFormat:@"%C", nextCell.character];
+            column++;
+        }
+
+        NSInteger effectiveColor = (bold && foregroundColor >= 0 && foregroundColor <= 7) ? foregroundColor + 8 : foregroundColor;
+        NSDictionary<NSAttributedStringKey, id> *attributes = @{
+            NSFontAttributeName: self.terminalFont,
+            NSForegroundColorAttributeName: CBColorForANSIIndex(effectiveColor),
+        };
+        [text drawAtPoint:NSMakePoint(originX + (CGFloat)startColumn * self.cellWidth,
+                                      originY + (CGFloat)row * self.cellHeight)
+           withAttributes:attributes];
+    }
+}
+
+- (void)buildConfigurationContent
+{
+    NSView *contentView = self.configurationSheet.contentView;
+
+    NSTextField *executableLabel = [NSTextField labelWithString:@"Executable"];
+    executableLabel.frame = NSMakeRect(20, 134, 110, 24);
+    [contentView addSubview:executableLabel];
+
+    self.executableField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, 132, 370, 24)];
+    [contentView addSubview:self.executableField];
+
+    NSTextField *argumentsLabel = [NSTextField labelWithString:@"Arguments"];
+    argumentsLabel.frame = NSMakeRect(20, 94, 110, 24);
+    [contentView addSubview:argumentsLabel];
+
+    self.argumentsField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, 92, 370, 24)];
+    [contentView addSubview:self.argumentsField];
+
+    NSTextField *fontSizeLabel = [NSTextField labelWithString:@"Font size"];
+    fontSizeLabel.frame = NSMakeRect(20, 54, 110, 24);
+    [contentView addSubview:fontSizeLabel];
+
+    self.fontSizeField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, 52, 72, 24)];
+    [contentView addSubview:self.fontSizeField];
+
+    self.fontSizeStepper = [[NSStepper alloc] initWithFrame:NSMakeRect(210, 50, 20, 28)];
+    self.fontSizeStepper.minValue = 8.0;
+    self.fontSizeStepper.maxValue = 48.0;
+    self.fontSizeStepper.increment = 1.0;
+    self.fontSizeStepper.target = self;
+    self.fontSizeStepper.action = @selector(fontSizeStepperChanged:);
+    [contentView addSubview:self.fontSizeStepper];
+
+    NSButton *cancelButton = [[NSButton alloc] initWithFrame:NSMakeRect(320, 14, 90, 30)];
+    cancelButton.title = @"Cancel";
+    cancelButton.bezelStyle = NSBezelStyleRounded;
+    cancelButton.target = self;
+    cancelButton.action = @selector(cancelConfiguration:);
+    [contentView addSubview:cancelButton];
+
+    NSButton *okButton = [[NSButton alloc] initWithFrame:NSMakeRect(420, 14, 80, 30)];
+    okButton.title = @"OK";
+    okButton.bezelStyle = NSBezelStyleRounded;
+    okButton.keyEquivalent = @"\r";
+    okButton.target = self;
+    okButton.action = @selector(saveConfiguration:);
+    [contentView addSubview:okButton];
+}
+
+- (void)loadConfigurationFields
+{
+    self.executableField.stringValue = self.configuredExecutablePath;
+    self.argumentsField.stringValue = self.configuredArgumentString;
+    self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
+    self.fontSizeStepper.doubleValue = self.configuredFontSize;
+}
+
+- (void)fontSizeStepperChanged:(id)sender
+{
+    self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.fontSizeStepper.doubleValue];
+}
+
+- (void)saveConfiguration:(id)sender
+{
+    CGFloat fontSize = self.fontSizeField.doubleValue;
+    fontSize = MIN(MAX(fontSize, 8.0), 48.0);
+
+    ScreenSaverDefaults *defaults = [self screenSaverDefaults];
+    [defaults setObject:self.executableField.stringValue forKey:CBExecutablePathKey];
+    [defaults setObject:self.argumentsField.stringValue forKey:CBArgumentStringKey];
+    [defaults setDouble:fontSize forKey:CBFontSizeKey];
+    [defaults synchronize];
+
+    self.terminalFont = nil;
+    [self stopCbonsaiProcess];
+    [self updateTerminalGeometry];
+    if (self.isAnimating) {
+        [self startCbonsaiProcess];
+    }
+
+    [[NSApplication sharedApplication] endSheet:self.configurationSheet];
+}
+
+- (void)cancelConfiguration:(id)sender
+{
+    [[NSApplication sharedApplication] endSheet:self.configurationSheet];
 }
 
 @end
