@@ -23,5 +23,6 @@ extern NSString * const CBCbonsaiVerboseKey;
 NSString *CBDefaultEnvironmentPath(void);
 NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void);
 NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> *options);
+NSArray<NSString *> *CBCbonsaiArgumentsFromOptionsWithAutomaticSeed(NSDictionary<NSString *, id> *options, NSInteger automaticSeed);
 
 NS_ASSUME_NONNULL_END

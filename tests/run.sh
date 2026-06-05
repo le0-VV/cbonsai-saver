@@ -229,6 +229,24 @@ do
   fi
 done
 
+for multi_display_seed_text in \
+  'CBCbonsaiArgumentsFromOptionsWithAutomaticSeed' \
+  'CBAutomaticCbonsaiSeedForScreen' \
+  'CBDisplayIdentifierForScreen' \
+  '@"NSScreenNumber"' \
+  'self.window.screen ?: NSScreen.mainScreen'
+do
+  if ! grep -Fq "$multi_display_seed_text" "$VIEW_PATH" "$COMMAND_LINE_PATH" "cbonsai saver/cbonsai saver/CBCommandLine.h" tests/CBCommandLineTests.m; then
+    echo "Missing multi-display automatic seed text: $multi_display_seed_text" >&2
+    exit 1
+  fi
+done
+
+if grep -Fq 'CBCbonsaiArgumentsFromOptions(self.configuredCbonsaiOptions)' "$VIEW_PATH"; then
+  echo "Screen saver should pass a display-salted automatic seed when launching cbonsai." >&2
+  exit 1
+fi
+
 if awk '
   /- \(void\)drawRect:/ { in_draw = 1 }
   /- \(void\)animateOneFrame/ { in_draw = 0 }

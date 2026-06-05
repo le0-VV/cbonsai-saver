@@ -146,6 +146,11 @@ NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void)
 
 NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> *options)
 {
+    return CBCbonsaiArgumentsFromOptionsWithAutomaticSeed(options, 0);
+}
+
+NSArray<NSString *> *CBCbonsaiArgumentsFromOptionsWithAutomaticSeed(NSDictionary<NSString *, id> *options, NSInteger automaticSeed)
+{
     NSMutableDictionary<NSString *, id> *mergedOptions = [CBDefaultCbonsaiOptions() mutableCopy];
     [mergedOptions addEntriesFromDictionary:options ?: @{}];
 
@@ -173,6 +178,8 @@ NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> 
     NSInteger seed = CBIntegerOption(mergedOptions, CBCbonsaiSeedKey);
     if (CBBoolOption(mergedOptions, CBCbonsaiSeedEnabledKey) && seed > 0) {
         [arguments addObject:[NSString stringWithFormat:@"--seed=%ld", (long)seed]];
+    } else if (automaticSeed > 0) {
+        [arguments addObject:[NSString stringWithFormat:@"--seed=%ld", (long)automaticSeed]];
     }
 
     if (CBBoolOption(mergedOptions, CBCbonsaiVerboseKey)) {
