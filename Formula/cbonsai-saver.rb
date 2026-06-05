@@ -1,8 +1,8 @@
 class CbonsaiSaver < Formula
   desc "macOS screen saver that runs bundled cbonsai"
   homepage "https://github.com/le0-VV/cbonsai-saver"
-  url "https://github.com/le0-VV/cbonsai-saver/releases/download/1.0/cbonsai-saver-1.0.zip"
-  sha256 "04f81d0a9f4c24014b969269d6b127c9bd55492eeb31984ab3de828c4d28162a"
+  url "https://github.com/le0-VV/cbonsai-saver/releases/download/1.1/cbonsai-saver-1.1.zip"
+  sha256 "ae87070e2bdcff20caf766a95106a9f3585764b0738c6ff3ffc7bc342723978e"
   license all_of: ["GPL-3.0-or-later", "X11-distribute-modifications-variant"]
 
   depends_on :macos
