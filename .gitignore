@@ -79,3 +79,4 @@ bin/
 .agents/brick/config.local.json
 __pycache__/
 *.pyc
+.agents/TODO.md

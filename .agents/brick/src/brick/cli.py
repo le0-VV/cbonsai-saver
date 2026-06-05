@@ -39,6 +39,7 @@ from brick.memory import (
 
 
 GITIGNORE_ENTRIES = (
+    ".agents/TODO.md",
     ".agents/brick/.venv/",
     ".agents/brick/index/",
     ".agents/brick/conflicts/",

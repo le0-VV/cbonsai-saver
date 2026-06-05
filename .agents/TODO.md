@@ -1,4 +1,0 @@
-- [x] Search Brick memory and record relevant repo instructions.
-- [x] Inspect the Release alias target.
-- [x] Stage the Release alias and work log.
-- [x] Commit the alias with the required author format.
