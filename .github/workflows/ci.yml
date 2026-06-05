@@ -29,6 +29,9 @@ jobs:
       - name: Check Homebrew formula syntax
         run: ruby -c Formula/cbonsai-saver.rb
 
+      - name: Check Homebrew cask syntax
+        run: ruby -c Casks/cbonsai-saver.rb
+
   build:
     name: Release build
     runs-on: macos-15
