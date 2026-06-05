@@ -198,6 +198,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)appendData:(NSData *)data;
 - (CBTerminalCell)cellAtColumn:(NSUInteger)column row:(NSUInteger)row;
 - (CGRect)contentBounds;
+- (CGRect)bottomContentBounds;
 - (void)showStatusMessage:(NSString *)message;
 
 @end
@@ -327,6 +328,36 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
                       (CGFloat)minimumRow,
                       (CGFloat)(maximumColumn - minimumColumn + 1),
                       (CGFloat)(maximumRow - minimumRow + 1));
+}
+
+- (CGRect)bottomContentBounds
+{
+    for (NSUInteger row = _rows; row > 0; row--) {
+        NSUInteger contentRow = row - 1;
+        BOOL foundContent = NO;
+        NSUInteger minimumColumn = _columns;
+        NSUInteger maximumColumn = 0;
+
+        for (NSUInteger column = 0; column < _columns; column++) {
+            CBTerminalCell cell = _cells[contentRow * _columns + column];
+            if (cell.character == ' ') {
+                continue;
+            }
+
+            foundContent = YES;
+            minimumColumn = MIN(minimumColumn, column);
+            maximumColumn = MAX(maximumColumn, column);
+        }
+
+        if (foundContent) {
+            return CGRectMake((CGFloat)minimumColumn,
+                              (CGFloat)contentRow,
+                              (CGFloat)(maximumColumn - minimumColumn + 1),
+                              1.0);
+        }
+    }
+
+    return CGRectMake(0.0, 0.0, 0.0, 0.0);
 }
 
 - (void)showStatusMessage:(NSString *)message
@@ -774,7 +805,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     CGPoint origin = CBTerminalContentOriginForBounds(self.bounds.size,
                                                       CGSizeMake((CGFloat)self.terminalBuffer.columns, (CGFloat)self.terminalBuffer.rows),
                                                       CGSizeMake(self.cellWidth, self.cellHeight),
-                                                      self.terminalBuffer.contentBounds);
+                                                      self.terminalBuffer.contentBounds,
+                                                      self.terminalBuffer.bottomContentBounds);
 
     for (NSUInteger row = 0; row < self.terminalBuffer.rows; row++) {
         [self drawBackgroundsForRow:row originX:origin.x originY:origin.y];

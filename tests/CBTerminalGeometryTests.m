@@ -42,6 +42,7 @@ int main(void)
         CGPoint centeredOrigin = CBTerminalContentOriginForBounds(CGSizeMake(300.0, 200.0),
                                                                   CGSizeMake(100.0, 40.0),
                                                                   CGSizeMake(2.0, 4.0),
+                                                                  CGRectMake(0.0, 0.0, 0.0, 0.0),
                                                                   CGRectMake(0.0, 0.0, 0.0, 0.0));
         CBAssertNearlyEqual(centeredOrigin.x, 50.0, @"Empty content should center the terminal grid horizontally");
         CBAssertNearlyEqual(centeredOrigin.y, 20.0, @"Empty content should center the terminal grid vertically");
@@ -49,9 +50,18 @@ int main(void)
         CGPoint contentOrigin = CBTerminalContentOriginForBounds(CGSizeMake(300.0, 200.0),
                                                                  CGSizeMake(100.0, 40.0),
                                                                  CGSizeMake(2.0, 4.0),
+                                                                 CGRectMake(10.0, 5.0, 20.0, 10.0),
                                                                  CGRectMake(10.0, 5.0, 20.0, 10.0));
         CBAssertNearlyEqual(contentOrigin.x, 110.0, @"Visible content should be horizontally centered");
         CBAssertNearlyEqual(contentOrigin.y, 124.0, @"Visible content should be bottom aligned with margin");
+
+        CGPoint anchoredOrigin = CBTerminalContentOriginForBounds(CGSizeMake(300.0, 200.0),
+                                                                  CGSizeMake(100.0, 40.0),
+                                                                  CGSizeMake(2.0, 4.0),
+                                                                  CGRectMake(0.0, 0.0, 36.0, 12.0),
+                                                                  CGRectMake(7.0, 11.0, 28.0, 1.0));
+        CBAssertNearlyEqual(anchoredOrigin.x, 108.0, @"Horizontal placement should follow the bottom content anchor");
+        CBAssertNearlyEqual(anchoredOrigin.y, 136.0, @"Vertical placement should still follow the full content bottom");
     }
 
     return 0;
