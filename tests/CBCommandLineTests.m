@@ -38,8 +38,6 @@ int main(void)
         ]));
 
         CBAssertArguments(@{
-            CBCbonsaiLiveKey: @YES,
-            CBCbonsaiInfiniteKey: @YES,
             CBCbonsaiTimeKey: @0.12,
             CBCbonsaiWaitKey: @8.5,
             CBCbonsaiMessageKey: @" quiet bonsai ",
@@ -78,9 +76,11 @@ int main(void)
         ]));
 
         CBAssertArguments(@{
-            CBCbonsaiLiveKey: @NO,
-            CBCbonsaiInfiniteKey: @NO,
+            @"cbonsaiLive": @NO,
+            @"cbonsaiInfinite": @NO,
         }, (@[
+            @"--live",
+            @"--infinite",
             @"--time=0.03",
             @"--wait=3",
             @"--leaf=&",

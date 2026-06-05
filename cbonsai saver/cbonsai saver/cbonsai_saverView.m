@@ -660,8 +660,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic, strong) NSWindow *configurationSheet;
 @property (nonatomic, strong) NSTextField *fontSizeField;
 @property (nonatomic, strong) NSStepper *fontSizeStepper;
-@property (nonatomic, strong) NSButton *liveButton;
-@property (nonatomic, strong) NSButton *infiniteButton;
 @property (nonatomic, strong) NSTextField *timeField;
 @property (nonatomic, strong) NSStepper *timeStepper;
 @property (nonatomic, strong) NSTextField *waitField;
@@ -802,8 +800,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     id legacyScreensaverValue = [defaults objectForKey:CBLegacyScreensaverKey];
     if ([legacyScreensaverValue respondsToSelector:@selector(boolValue)] && [legacyScreensaverValue boolValue]) {
-        [defaults setBool:YES forKey:CBCbonsaiLiveKey];
-        [defaults setBool:YES forKey:CBCbonsaiInfiniteKey];
         if (fabs([defaults doubleForKey:CBCbonsaiWaitKey] - 4.0) < 0.0001) {
             [defaults setDouble:3.0 forKey:CBCbonsaiWaitKey];
         }
@@ -1036,7 +1032,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
 
     if (!self.stoppingChildProcess) {
-        [self.terminalBuffer showStatusMessage:@"cbonsai exited. Enable --live and --infinite for continuous output."];
+        [self.terminalBuffer showStatusMessage:@"cbonsai exited."];
         [self setNeedsDisplay:YES];
     }
 }
@@ -1157,15 +1153,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self setToolTip:@"Terminal font size." forViews:@[fontSizeLabel, self.fontSizeField, self.fontSizeStepper]];
     [self addHelpButtonForAnchor:@"font-size" toView:documentView frame:NSMakeRect(fieldX + 108.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
-
-    y = [self addSectionTitle:@"Mode" toView:documentView y:y];
-    self.liveButton = [self addCheckbox:@"Live (--live)" toView:documentView frame:NSMakeRect(labelX, y - 2, 116, 24)];
-    [self setToolTip:@"Animate growth." forViews:@[self.liveButton]];
-    [self addHelpButtonForAnchor:@"live" toView:documentView frame:NSMakeRect(labelX + 120.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    self.infiniteButton = [self addCheckbox:@"Infinite (--infinite)" toView:documentView frame:NSMakeRect(labelX + 180, y - 2, 152, 24)];
-    [self setToolTip:@"Keep cbonsai running." forViews:@[self.infiniteButton]];
-    [self addHelpButtonForAnchor:@"infinite" toView:documentView frame:NSMakeRect(labelX + 336.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 42.0;
 
     y = [self addSectionTitle:@"Timing" toView:documentView y:y];
     NSTextField *timeLabel = [self addLabel:@"Growth time (--time)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
@@ -1334,8 +1321,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
     self.fontSizeStepper.doubleValue = self.configuredFontSize;
 
-    self.liveButton.state = [self boolOption:options key:CBCbonsaiLiveKey] ? NSControlStateValueOn : NSControlStateValueOff;
-    self.infiniteButton.state = [self boolOption:options key:CBCbonsaiInfiniteKey] ? NSControlStateValueOn : NSControlStateValueOff;
     [self setDoubleField:self.timeField stepper:self.timeStepper value:[self doubleOption:options key:CBCbonsaiTimeKey]];
     [self setDoubleField:self.waitField stepper:self.waitStepper value:[self doubleOption:options key:CBCbonsaiWaitKey]];
     self.messageField.stringValue = [self stringOption:options key:CBCbonsaiMessageKey];
@@ -1368,8 +1353,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     ScreenSaverDefaults *defaults = [self screenSaverDefaults];
     [defaults setDouble:fontSize forKey:CBFontSizeKey];
-    [defaults setBool:self.liveButton.state == NSControlStateValueOn forKey:CBCbonsaiLiveKey];
-    [defaults setBool:self.infiniteButton.state == NSControlStateValueOn forKey:CBCbonsaiInfiniteKey];
     [defaults setDouble:time forKey:CBCbonsaiTimeKey];
     [defaults setDouble:wait forKey:CBCbonsaiWaitKey];
     [defaults setObject:[self trimmedStringFromField:self.messageField] forKey:CBCbonsaiMessageKey];

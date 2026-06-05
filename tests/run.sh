@@ -42,6 +42,21 @@ if grep -Fq 'CBCbonsaiScreensaverKey' "cbonsai saver/cbonsai saver/CBCommandLine
   exit 1
 fi
 
+if grep -Fq 'CBCbonsaiLiveKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH" || grep -Fq 'CBCbonsaiInfiniteKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
+  echo "Live and infinite modes should always be enabled, not exposed as settings." >&2
+  exit 1
+fi
+
+if grep -Fq 'Live (--live)' "$VIEW_PATH" || grep -Fq 'Infinite (--infinite)' "$VIEW_PATH" || grep -Fq 'addSectionTitle:@"Mode"' "$VIEW_PATH"; then
+  echo "Live and infinite controls should not be present in the configuration sheet." >&2
+  exit 1
+fi
+
+if grep -Fq 'id="live"' "$MANUAL_PATH" || grep -Fq 'id="infinite"' "$MANUAL_PATH"; then
+  echo "Live and infinite should not have setting manual anchors." >&2
+  exit 1
+fi
+
 if ! grep -Fq "Bundle cbonsai" "$PROJECT_PATH" || ! grep -Fq "bundle-cbonsai.sh" "$PROJECT_PATH"; then
   echo "Xcode target should bundle cbonsai during build." >&2
   exit 1
@@ -49,8 +64,6 @@ fi
 
 for anchor in \
   font-size \
-  live \
-  infinite \
   time \
   wait \
   message \
@@ -84,8 +97,6 @@ do
   fi
 done <<'EOF'
 Terminal font size.
-Animate growth.
-Keep cbonsai running.
 Growth delay in seconds.
 Delay after each tree.
 Text rendered with the tree.

@@ -5,8 +5,6 @@
 
 #import "CBCommandLine.h"
 
-NSString * const CBCbonsaiLiveKey = @"cbonsaiLive";
-NSString * const CBCbonsaiInfiniteKey = @"cbonsaiInfinite";
 NSString * const CBCbonsaiTimeKey = @"cbonsaiTime";
 NSString * const CBCbonsaiWaitKey = @"cbonsaiWait";
 NSString * const CBCbonsaiMessageKey = @"cbonsaiMessage";
@@ -66,8 +64,6 @@ NSString *CBDefaultEnvironmentPath(void)
 NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void)
 {
     return @{
-        CBCbonsaiLiveKey: @YES,
-        CBCbonsaiInfiniteKey: @YES,
         CBCbonsaiTimeKey: @0.03,
         CBCbonsaiWaitKey: @3.0,
         CBCbonsaiMessageKey: @"",
@@ -95,12 +91,8 @@ NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> 
     [mergedOptions addEntriesFromDictionary:options ?: @{}];
 
     NSMutableArray<NSString *> *arguments = [NSMutableArray array];
-    if (CBBoolOption(mergedOptions, CBCbonsaiLiveKey)) {
-        [arguments addObject:@"--live"];
-    }
-    if (CBBoolOption(mergedOptions, CBCbonsaiInfiniteKey)) {
-        [arguments addObject:@"--infinite"];
-    }
+    [arguments addObject:@"--live"];
+    [arguments addObject:@"--infinite"];
 
     [arguments addObject:[@"--time=" stringByAppendingString:CBFormatDouble(CBDoubleOption(mergedOptions, CBCbonsaiTimeKey))]];
     [arguments addObject:[@"--wait=" stringByAppendingString:CBFormatDouble(CBDoubleOption(mergedOptions, CBCbonsaiWaitKey))]];
