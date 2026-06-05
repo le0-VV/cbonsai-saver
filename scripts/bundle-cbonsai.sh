@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH
 
 if [ -z "${TARGET_BUILD_DIR:-}" ] || [ -z "${UNLOCALIZED_RESOURCES_FOLDER_PATH:-}" ]; then
   echo "TARGET_BUILD_DIR and UNLOCALIZED_RESOURCES_FOLDER_PATH are required." >&2
@@ -11,6 +12,19 @@ fi
 resources_dir="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 bundled_cbonsai="${resources_dir}/cbonsai"
 lib_dir="${resources_dir}/lib"
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+
+is_trusted_cbonsai_source()
+{
+  case "$1" in
+    "${repo_root}"/build/upstream/cbonsai-v1.4.2/cbonsai|/opt/homebrew/bin/cbonsai|/opt/homebrew/opt/cbonsai/bin/cbonsai|/opt/homebrew/Cellar/cbonsai/*/bin/cbonsai|/usr/local/bin/cbonsai|/usr/local/opt/cbonsai/bin/cbonsai|/usr/local/Cellar/cbonsai/*/bin/cbonsai)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
 
 if [ -n "${CBONSAI_BINARY_PATH:-}" ]; then
   cbonsai_source="${CBONSAI_BINARY_PATH}"
@@ -20,6 +34,29 @@ fi
 
 if [ -z "$cbonsai_source" ] || [ ! -x "$cbonsai_source" ]; then
   echo "Unable to find cbonsai. Install cbonsai or set CBONSAI_BINARY_PATH." >&2
+  exit 1
+fi
+
+case "$cbonsai_source" in
+  /*)
+    ;;
+  *)
+    echo "Refusing to bundle cbonsai from a non-absolute path: $cbonsai_source" >&2
+    exit 1
+    ;;
+esac
+
+case "$(basename "$cbonsai_source")" in
+  cbonsai)
+    ;;
+  *)
+    echo "Refusing to bundle unexpected cbonsai binary name: $cbonsai_source" >&2
+    exit 1
+    ;;
+esac
+
+if ! is_trusted_cbonsai_source "$cbonsai_source"; then
+  echo "Refusing to bundle cbonsai from an unsupported location: $cbonsai_source" >&2
   exit 1
 fi
 
@@ -44,12 +81,29 @@ is_bundled_dependency()
   esac
 }
 
+is_trusted_dependency()
+{
+  case "$1" in
+    /opt/homebrew/opt/*|/opt/homebrew/Cellar/*|/usr/local/opt/*|/usr/local/Cellar/*|"${repo_root}"/build/upstream/*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 add_dependencies()
 {
   otool -L "$1" | awk 'NR > 1 { print $1 }' | while IFS= read -r dependency
   do
     if ! is_bundled_dependency "$dependency"; then
       continue
+    fi
+
+    if ! is_trusted_dependency "$dependency"; then
+      echo "Unsupported cbonsai dependency path: $dependency" >&2
+      exit 1
     fi
 
     if [ ! -f "$dependency" ]; then
@@ -77,7 +131,7 @@ rewrite_dependency_paths()
 
 sign_binary()
 {
-  if [ "${CODE_SIGNING_ALLOWED:-YES}" != "NO" ] && command -v codesign >/dev/null 2>&1; then
+  if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - --timestamp=none "$1"
   fi
 }
