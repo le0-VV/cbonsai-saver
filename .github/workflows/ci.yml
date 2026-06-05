@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run local tests
+        run: ./tests/run.sh
+
+      - name: Check Homebrew formula syntax
+        run: ruby -c Formula/cbonsai-saver.rb
+
+  build:
+    name: Release build
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install cbonsai
+        run: brew install cbonsai
+
+      - name: Build release archive
+        run: ./scripts/package-release.sh 1.0
+
+      - name: Show release archive checksum
+        run: shasum -a 256 build/release/artifacts/cbonsai-saver-1.0.zip
