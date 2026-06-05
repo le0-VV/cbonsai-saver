@@ -1,6 +1,4 @@
 - [x] Search Brick memory and record relevant repo instructions.
-- [x] Read the settings implementation and current test script.
-- [x] Add concise tooltips to setting rows and controls.
-- [x] Add a static test for expected tooltip coverage.
-- [x] Verify tests/build and review the diff.
-- [x] Commit the completed logical unit with the required author format.
+- [x] Inspect the Release alias target.
+- [x] Stage the Release alias and work log.
+- [x] Commit the alias with the required author format.
