@@ -209,6 +209,46 @@ if ! grep -Fq 'CBMaximumTerminalColumns = 220' "$VIEW_PATH" || ! grep -Fq 'CBMax
   exit 1
 fi
 
+if grep -Fq '[self setAnimationTimeInterval:1.0 / 30.0]' "$VIEW_PATH"; then
+  echo "Screen saver should not keep a 30 Hz idle animation timer." >&2
+  exit 1
+fi
+
+for performance_text in \
+  'CBIdleAnimationTimeInterval = 1.0' \
+  'CBTerminalDataFlushInterval = 1.0 / 30.0' \
+  'enqueueTerminalData:' \
+  'flushPendingTerminalDataAndDisplay' \
+  'terminalTextAttributesCache' \
+  'cellsForRow:' \
+  'contentMetrics'
+do
+  if ! grep -Fq "$performance_text" "$VIEW_PATH"; then
+    echo "Missing performance hardening text: $performance_text" >&2
+    exit 1
+  fi
+done
+
+if awk '
+  /- \(void\)drawRect:/ { in_draw = 1 }
+  /- \(void\)animateOneFrame/ { in_draw = 0 }
+  in_draw && /updateTerminalGeometry/ { found = 1 }
+  END { exit found ? 0 : 1 }
+' "$VIEW_PATH"; then
+  echo "drawRect should not recompute terminal geometry." >&2
+  exit 1
+fi
+
+if grep -Fq '[availableData copy]' "$VIEW_PATH" || grep -Fq '[self.pendingTerminalData copy]' "$VIEW_PATH"; then
+  echo "PTY batching should not copy coalesced data before parsing." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'NSData *data = availableData;' "$VIEW_PATH" || ! grep -Fq 'self.pendingTerminalData = [NSMutableData dataWithCapacity:data.length];' "$VIEW_PATH"; then
+  echo "PTY batching should pass read buffers through and swap pending buffers." >&2
+  exit 1
+fi
+
 if grep -Fq 'CBCbonsaiScreensaverKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
   echo "Screensaver mode should not be exposed." >&2
   exit 1
