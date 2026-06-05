@@ -21,6 +21,12 @@ static void CBAssertArguments(NSDictionary<NSString *, id> *options, NSArray<NSS
     CBAssert([actual isEqualToArray:expected], [NSString stringWithFormat:@"Compiled arguments %@, expected %@", actual, expected]);
 }
 
+static void CBAssertArgumentsWithAutomaticSeed(NSDictionary<NSString *, id> *options, NSInteger automaticSeed, NSArray<NSString *> *expected)
+{
+    NSArray<NSString *> *actual = CBCbonsaiArgumentsFromOptionsWithAutomaticSeed(options, automaticSeed);
+    CBAssert([actual isEqualToArray:expected], [NSString stringWithFormat:@"Compiled arguments %@, expected %@", actual, expected]);
+}
+
 int main(void)
 {
     @autoreleasepool {
@@ -36,6 +42,19 @@ int main(void)
             @"--color=2,3,10,11",
             @"--multiplier=5",
             @"--life=32",
+        ]));
+
+        CBAssertArgumentsWithAutomaticSeed(@{}, 4242, (@[
+            @"--live",
+            @"--infinite",
+            @"--time=0.03",
+            @"--wait=3",
+            @"--base=1",
+            @"--leaf=&",
+            @"--color=2,3,10,11",
+            @"--multiplier=5",
+            @"--life=32",
+            @"--seed=4242",
         ]));
 
         CBAssertArguments(@{
@@ -64,6 +83,22 @@ int main(void)
             @"--life=144",
             @"--seed=12345",
             @"--verbose",
+        ]));
+
+        CBAssertArgumentsWithAutomaticSeed(@{
+            CBCbonsaiSeedEnabledKey: @YES,
+            CBCbonsaiSeedKey: @12345,
+        }, 999, (@[
+            @"--live",
+            @"--infinite",
+            @"--time=0.03",
+            @"--wait=3",
+            @"--base=1",
+            @"--leaf=&",
+            @"--color=2,3,10,11",
+            @"--multiplier=5",
+            @"--life=32",
+            @"--seed=12345",
         ]));
 
         CBAssertArguments(@{

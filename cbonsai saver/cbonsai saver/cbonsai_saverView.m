@@ -14,6 +14,7 @@
 #import <fcntl.h>
 #import <limits.h>
 #import <signal.h>
+#import <stdint.h>
 #import <stdlib.h>
 #import <string.h>
 #import <sys/ioctl.h>
@@ -224,6 +225,22 @@ static unsigned short CBClampedUnsignedShortFromCGFloat(CGFloat value)
         return 0;
     }
     return (unsigned short)MIN(value, (CGFloat)USHRT_MAX);
+}
+
+static uint32_t CBDisplayIdentifierForScreen(NSScreen *screen)
+{
+    id screenNumber = screen.deviceDescription[@"NSScreenNumber"];
+    return [screenNumber respondsToSelector:@selector(unsignedIntValue)] ? [screenNumber unsignedIntValue] : 0;
+}
+
+static NSInteger CBAutomaticCbonsaiSeedForScreen(NSScreen *screen)
+{
+    uint32_t seed = arc4random();
+    uint32_t displayIdentifier = CBDisplayIdentifierForScreen(screen);
+    seed ^= displayIdentifier + 0x9E3779B9u + (seed << 6) + (seed >> 2);
+    seed ^= (uint32_t)getpid();
+    seed %= (uint32_t)INT_MAX;
+    return (NSInteger)(seed == 0 ? 1 : seed);
 }
 
 static char **CBCStringArrayFromStrings(NSArray<NSString *> *strings)
@@ -1092,7 +1109,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return;
     }
 
-    NSArray<NSString *> *arguments = CBCbonsaiArgumentsFromOptions(self.configuredCbonsaiOptions);
+    NSInteger automaticSeed = CBAutomaticCbonsaiSeedForScreen(self.window.screen ?: NSScreen.mainScreen);
+    NSArray<NSString *> *arguments = CBCbonsaiArgumentsFromOptionsWithAutomaticSeed(self.configuredCbonsaiOptions, automaticSeed);
 
     char **processArgv = [self createProcessArgvWithExecutablePath:executablePath arguments:arguments];
     char **processEnvironment = [self createProcessEnvironment];
