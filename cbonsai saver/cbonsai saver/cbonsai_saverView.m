@@ -831,7 +831,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic, strong) NSStepper *multiplierStepper;
 @property (nonatomic, strong) NSTextField *lifeField;
 @property (nonatomic, strong) NSStepper *lifeStepper;
-@property (nonatomic, strong) NSButton *printButton;
 @property (nonatomic, strong) NSButton *seedEnabledButton;
 @property (nonatomic, strong) NSTextField *seedField;
 @property (nonatomic, strong) NSButton *saveEnabledButton;
@@ -839,7 +838,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic, strong) NSButton *loadEnabledButton;
 @property (nonatomic, strong) NSTextField *loadPathField;
 @property (nonatomic, strong) NSButton *verboseButton;
-@property (nonatomic, strong) NSButton *helpButton;
 
 @end
 
@@ -1389,21 +1387,13 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     y += 48.0;
 
     y = [self addSectionTitle:@"Output" toView:documentView y:y];
-    self.printButton = [self addCheckbox:@"Print when finished" toView:documentView frame:NSMakeRect(labelX, y - 2, 222, 24)];
-    [self setToolTip:@"Print final tree." forViews:@[self.printButton]];
-    [self addHelpButtonForAnchor:@"print" toView:documentView frame:NSMakeRect(labelX + 226.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    self.verboseButton = [self addCheckbox:@"Verbose" toView:documentView frame:NSMakeRect(labelX + 280, y - 2, 146, 24)];
-    [self setToolTip:@"Print extra output." forViews:@[self.verboseButton]];
-    [self addHelpButtonForAnchor:@"verbose" toView:documentView frame:NSMakeRect(labelX + 430.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    self.helpButton = [self addCheckbox:@"Show help" toView:documentView frame:NSMakeRect(labelX + 470, y - 2, 130, 24)];
-    [self setToolTip:@"Show cbonsai help and exit." forViews:@[self.helpButton]];
-    [self addHelpButtonForAnchor:@"help" toView:documentView frame:NSMakeRect(labelX + 604.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 34.0;
-
     self.seedEnabledButton = [self addCheckbox:@"Seed" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
     self.seedField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 120, 24)];
     [self setToolTip:@"Fixed random seed." forViews:@[self.seedEnabledButton, self.seedField]];
     [self addHelpButtonForAnchor:@"seed" toView:documentView frame:NSMakeRect(fieldX + 128.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    self.verboseButton = [self addCheckbox:@"Verbose" toView:documentView frame:NSMakeRect(labelX + 470, y - 2, 130, 24)];
+    [self setToolTip:@"Print extra output." forViews:@[self.verboseButton]];
+    [self addHelpButtonForAnchor:@"verbose" toView:documentView frame:NSMakeRect(labelX + 604.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     self.saveEnabledButton = [self addCheckbox:@"Save file" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
@@ -1565,7 +1555,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self selectColorPopUpButtonsWithColorString:[self stringOption:options key:CBCbonsaiColorKey]];
     [self setIntegerField:self.multiplierField stepper:self.multiplierStepper value:[self integerOption:options key:CBCbonsaiMultiplierKey]];
     [self setIntegerField:self.lifeField stepper:self.lifeStepper value:[self integerOption:options key:CBCbonsaiLifeKey]];
-    self.printButton.state = [self boolOption:options key:CBCbonsaiPrintKey] ? NSControlStateValueOn : NSControlStateValueOff;
     self.seedEnabledButton.state = [self boolOption:options key:CBCbonsaiSeedEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
     self.seedField.stringValue = [NSString stringWithFormat:@"%ld", (long)[self integerOption:options key:CBCbonsaiSeedKey]];
     self.saveEnabledButton.state = [self boolOption:options key:CBCbonsaiSaveEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
@@ -1573,7 +1562,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.loadEnabledButton.state = [self boolOption:options key:CBCbonsaiLoadEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
     self.loadPathField.stringValue = [self stringOption:options key:CBCbonsaiLoadPathKey];
     self.verboseButton.state = [self boolOption:options key:CBCbonsaiVerboseKey] ? NSControlStateValueOn : NSControlStateValueOff;
-    self.helpButton.state = [self boolOption:options key:CBCbonsaiHelpKey] ? NSControlStateValueOn : NSControlStateValueOff;
     [self updateOptionalFieldStates];
 }
 
@@ -1594,7 +1582,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [defaults setObject:[self colorStringFromColorPopUpButtons] forKey:CBCbonsaiColorKey];
     [defaults setInteger:multiplier forKey:CBCbonsaiMultiplierKey];
     [defaults setInteger:life forKey:CBCbonsaiLifeKey];
-    [defaults setBool:self.printButton.state == NSControlStateValueOn forKey:CBCbonsaiPrintKey];
     [defaults setBool:self.seedEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiSeedEnabledKey];
     [defaults setInteger:self.seedField.integerValue forKey:CBCbonsaiSeedKey];
     [defaults setBool:self.saveEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiSaveEnabledKey];
@@ -1602,7 +1589,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [defaults setBool:self.loadEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiLoadEnabledKey];
     [defaults setObject:[self trimmedStringFromField:self.loadPathField] forKey:CBCbonsaiLoadPathKey];
     [defaults setBool:self.verboseButton.state == NSControlStateValueOn forKey:CBCbonsaiVerboseKey];
-    [defaults setBool:self.helpButton.state == NSControlStateValueOn forKey:CBCbonsaiHelpKey];
     [defaults synchronize];
 
     self.terminalFont = nil;

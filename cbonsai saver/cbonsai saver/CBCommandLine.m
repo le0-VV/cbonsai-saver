@@ -14,7 +14,6 @@ NSString * const CBCbonsaiLeafKey = @"cbonsaiLeaf";
 NSString * const CBCbonsaiColorKey = @"cbonsaiColor";
 NSString * const CBCbonsaiMultiplierKey = @"cbonsaiMultiplier";
 NSString * const CBCbonsaiLifeKey = @"cbonsaiLife";
-NSString * const CBCbonsaiPrintKey = @"cbonsaiPrint";
 NSString * const CBCbonsaiSeedEnabledKey = @"cbonsaiSeedEnabled";
 NSString * const CBCbonsaiSeedKey = @"cbonsaiSeed";
 NSString * const CBCbonsaiSaveEnabledKey = @"cbonsaiSaveEnabled";
@@ -22,7 +21,6 @@ NSString * const CBCbonsaiSavePathKey = @"cbonsaiSavePath";
 NSString * const CBCbonsaiLoadEnabledKey = @"cbonsaiLoadEnabled";
 NSString * const CBCbonsaiLoadPathKey = @"cbonsaiLoadPath";
 NSString * const CBCbonsaiVerboseKey = @"cbonsaiVerbose";
-NSString * const CBCbonsaiHelpKey = @"cbonsaiHelp";
 
 static BOOL CBBoolOption(NSDictionary<NSString *, id> *options, NSString *key)
 {
@@ -73,7 +71,6 @@ NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void)
         CBCbonsaiColorKey: @"2,3,10,11",
         CBCbonsaiMultiplierKey: @5,
         CBCbonsaiLifeKey: @32,
-        CBCbonsaiPrintKey: @NO,
         CBCbonsaiSeedEnabledKey: @NO,
         CBCbonsaiSeedKey: @0,
         CBCbonsaiSaveEnabledKey: @NO,
@@ -81,7 +78,6 @@ NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void)
         CBCbonsaiLoadEnabledKey: @NO,
         CBCbonsaiLoadPathKey: @"",
         CBCbonsaiVerboseKey: @NO,
-        CBCbonsaiHelpKey: @NO,
     };
 }
 
@@ -111,9 +107,6 @@ NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> 
     [arguments addObject:[NSString stringWithFormat:@"--multiplier=%ld", (long)CBIntegerOption(mergedOptions, CBCbonsaiMultiplierKey)]];
     [arguments addObject:[NSString stringWithFormat:@"--life=%ld", (long)CBIntegerOption(mergedOptions, CBCbonsaiLifeKey)]];
 
-    if (CBBoolOption(mergedOptions, CBCbonsaiPrintKey)) {
-        [arguments addObject:@"--print"];
-    }
     if (CBBoolOption(mergedOptions, CBCbonsaiSeedEnabledKey)) {
         [arguments addObject:[NSString stringWithFormat:@"--seed=%ld", (long)CBIntegerOption(mergedOptions, CBCbonsaiSeedKey)]];
     }
@@ -130,9 +123,6 @@ NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> 
 
     if (CBBoolOption(mergedOptions, CBCbonsaiVerboseKey)) {
         [arguments addObject:@"--verbose"];
-    }
-    if (CBBoolOption(mergedOptions, CBCbonsaiHelpKey)) {
-        [arguments addObject:@"--help"];
     }
 
     return arguments;

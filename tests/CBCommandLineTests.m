@@ -48,7 +48,6 @@ int main(void)
             CBCbonsaiColorKey: @"22,94,40,82",
             CBCbonsaiMultiplierKey: @13,
             CBCbonsaiLifeKey: @144,
-            CBCbonsaiPrintKey: @YES,
             CBCbonsaiSeedEnabledKey: @YES,
             CBCbonsaiSeedKey: @12345,
             CBCbonsaiSaveEnabledKey: @YES,
@@ -56,7 +55,6 @@ int main(void)
             CBCbonsaiLoadEnabledKey: @YES,
             CBCbonsaiLoadPathKey: @" /tmp/cbonsai-load ",
             CBCbonsaiVerboseKey: @YES,
-            CBCbonsaiHelpKey: @YES,
         }, (@[
             @"--live",
             @"--infinite",
@@ -68,12 +66,10 @@ int main(void)
             @"--color=22,94,40,82",
             @"--multiplier=13",
             @"--life=144",
-            @"--print",
             @"--seed=12345",
             @"--save=/tmp/cbonsai-save",
             @"--load=/tmp/cbonsai-load",
             @"--verbose",
-            @"--help",
         ]));
 
         CBAssertArguments(@{

@@ -57,6 +57,11 @@ if grep -Fq 'CBCbonsaiScreensaverKey' "cbonsai saver/cbonsai saver/CBCommandLine
   exit 1
 fi
 
+if grep -Fq 'CBCbonsaiPrintKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH" || grep -Fq 'CBCbonsaiHelpKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
+  echo "Print and help should not be supported as screen saver settings." >&2
+  exit 1
+fi
+
 if grep -Fq 'CBCbonsaiLiveKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH" || grep -Fq 'CBCbonsaiInfiniteKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
   echo "Live and infinite modes should always be enabled, not exposed as settings." >&2
   exit 1
@@ -64,6 +69,11 @@ fi
 
 if grep -Fq 'Live (--live)' "$VIEW_PATH" || grep -Fq 'Infinite (--infinite)' "$VIEW_PATH" || grep -Fq 'addSectionTitle:@"Mode"' "$VIEW_PATH"; then
   echo "Live and infinite controls should not be present in the configuration sheet." >&2
+  exit 1
+fi
+
+if grep -Fq 'Print when finished' "$VIEW_PATH" || grep -Fq 'Show help' "$VIEW_PATH"; then
+  echo "Print and help controls should not be present in the configuration sheet." >&2
   exit 1
 fi
 
@@ -110,6 +120,11 @@ if grep -Fq 'id="live"' "$MANUAL_PATH" || grep -Fq 'id="infinite"' "$MANUAL_PATH
   exit 1
 fi
 
+if grep -Fq 'id="print"' "$MANUAL_PATH" || grep -Fq 'id="help"' "$MANUAL_PATH"; then
+  echo "Print and help should not have setting manual anchors." >&2
+  exit 1
+fi
+
 if ! grep -Fq "Bundle cbonsai" "$PROJECT_PATH" || ! grep -Fq "bundle-cbonsai.sh" "$PROJECT_PATH"; then
   echo "Xcode target should bundle cbonsai during build." >&2
   exit 1
@@ -124,12 +139,10 @@ for anchor in \
   color \
   multiplier \
   life \
-  print \
   seed \
   save \
   load \
-  verbose \
-  help
+  verbose
 do
   if ! grep -q "id=\"$anchor\"" "$MANUAL_PATH"; then
     echo "Missing cbonsai manual anchor: $anchor" >&2
@@ -181,11 +194,9 @@ Character used for leaves.
 Choose fixed ANSI colours.
 Branch density.
 How long branches keep growing.
-Print final tree.
 Fixed random seed.
 Save tree state file.
 Load tree state file.
 Print extra output.
-Show cbonsai help and exit.
 Open manual.
 EOF

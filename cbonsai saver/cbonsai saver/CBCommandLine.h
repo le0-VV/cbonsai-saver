@@ -16,7 +16,6 @@ extern NSString * const CBCbonsaiLeafKey;
 extern NSString * const CBCbonsaiColorKey;
 extern NSString * const CBCbonsaiMultiplierKey;
 extern NSString * const CBCbonsaiLifeKey;
-extern NSString * const CBCbonsaiPrintKey;
 extern NSString * const CBCbonsaiSeedEnabledKey;
 extern NSString * const CBCbonsaiSeedKey;
 extern NSString * const CBCbonsaiSaveEnabledKey;
@@ -24,7 +23,6 @@ extern NSString * const CBCbonsaiSavePathKey;
 extern NSString * const CBCbonsaiLoadEnabledKey;
 extern NSString * const CBCbonsaiLoadPathKey;
 extern NSString * const CBCbonsaiVerboseKey;
-extern NSString * const CBCbonsaiHelpKey;
 
 NSString *CBDefaultEnvironmentPath(void);
 NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void);
