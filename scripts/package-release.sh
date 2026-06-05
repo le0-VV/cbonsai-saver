@@ -13,6 +13,7 @@ derived_data="${build_root}/DerivedData"
 artifacts_dir="${build_root}/artifacts"
 product_dir="${derived_data}/Build/Products/${configuration}"
 product="${product_dir}/cbonsai saver.saver"
+staging_dir="${build_root}/staging/cbonsai-saver-${version}"
 archive="${repo_root}/${artifacts_dir}/cbonsai-saver-${version}.zip"
 
 mkdir -p "$artifacts_dir"
@@ -30,10 +31,15 @@ if [ ! -d "$product" ]; then
   exit 1
 fi
 
+rm -rf "$staging_dir"
+mkdir -p "$staging_dir"
+/usr/bin/ditto --norsrc "$product" "${staging_dir}/cbonsai saver.saver"
+cp -f LICENSE THIRD_PARTY_NOTICES.md SECURITY.md "$staging_dir/"
+
 export COPYFILE_DISABLE=1
 (
-  cd "$product_dir"
-  /usr/bin/ditto --norsrc -c -k --keepParent "cbonsai saver.saver" "$archive"
+  cd "$staging_dir"
+  /usr/bin/ditto --norsrc -c -k . "$archive"
 )
 
 shasum -a 256 "$archive"

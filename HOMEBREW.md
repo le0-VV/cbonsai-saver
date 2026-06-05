@@ -26,3 +26,6 @@ Build the release asset before drafting or publishing a GitHub release:
 The script writes `build/release/artifacts/cbonsai-saver-1.0.zip` and prints its
 SHA-256. The formula URL and SHA-256 must match the uploaded GitHub release
 asset.
+
+The release zip includes the screen saver bundle, `LICENSE`,
+`THIRD_PARTY_NOTICES.md`, and `SECURITY.md`.
