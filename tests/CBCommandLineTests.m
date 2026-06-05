@@ -15,36 +15,68 @@ static void CBAssert(BOOL condition, NSString *message)
     }
 }
 
-static void CBAssertArguments(NSString *input, NSArray<NSString *> *expected)
+static void CBAssertArguments(NSDictionary<NSString *, id> *options, NSArray<NSString *> *expected)
 {
-    NSError *error = nil;
-    NSArray<NSString *> *actual = CBParseArgumentString(input, &error);
-    CBAssert(actual != nil, [NSString stringWithFormat:@"Expected arguments for input '%@', got error '%@'", input, error.localizedDescription]);
-    CBAssert([actual isEqualToArray:expected], [NSString stringWithFormat:@"Input '%@' parsed as %@, expected %@", input, actual, expected]);
+    NSArray<NSString *> *actual = CBCbonsaiArgumentsFromOptions(options);
+    CBAssert([actual isEqualToArray:expected], [NSString stringWithFormat:@"Compiled arguments %@, expected %@", actual, expected]);
 }
 
 int main(void)
 {
     @autoreleasepool {
-        CBAssertArguments(@"", @[]);
-        CBAssertArguments(@"--screensaver -M 7 -L 80", (@[@"--screensaver", @"-M", @"7", @"-L", @"80"]));
-        CBAssertArguments(@"--message 'quiet bonsai' --leaf='&,o'", (@[@"--message", @"quiet bonsai", @"--leaf=&,o"]));
-        CBAssertArguments(@"--message=\"escaped \\\"quote\\\"\"", (@[@"--message=escaped \"quote\""]));
-        CBAssertArguments(@"--message hello\\ world", (@[@"--message", @"hello world"]));
-
-        NSError *error = nil;
-        NSArray<NSString *> *unterminatedQuote = CBParseArgumentString(@"--message 'open", &error);
-        CBAssert(unterminatedQuote == nil, @"Unterminated quote should fail.");
-        CBAssert([error.domain isEqualToString:CBCommandLineErrorDomain], @"Unterminated quote should use the command-line error domain.");
-
-        error = nil;
-        NSArray<NSString *> *trailingEscape = CBParseArgumentString(@"--message hello\\", &error);
-        CBAssert(trailingEscape == nil, @"Trailing escape should fail.");
-        CBAssert([error.domain isEqualToString:CBCommandLineErrorDomain], @"Trailing escape should use the command-line error domain.");
-
         CBAssert([CBDefaultExecutablePath() isEqualToString:@"cbonsai"], @"Default executable should use PATH lookup for original cbonsai.");
-        CBAssert([CBDefaultArgumentString() isEqualToString:@"--screensaver"], @"Default arguments should use cbonsai screensaver mode.");
         CBAssert([CBDefaultEnvironmentPath() containsString:@"/opt/homebrew/bin"], @"Default PATH should include Homebrew on Apple Silicon.");
+
+        CBAssertArguments(@{}, (@[
+            @"--screensaver",
+            @"--time=0.03",
+            @"--wait=4",
+            @"--leaf=&",
+            @"--color=2,3,10,11",
+            @"--multiplier=5",
+            @"--life=32",
+        ]));
+
+        CBAssertArguments(@{
+            CBCbonsaiScreensaverKey: @NO,
+            CBCbonsaiLiveKey: @YES,
+            CBCbonsaiInfiniteKey: @YES,
+            CBCbonsaiTimeKey: @0.12,
+            CBCbonsaiWaitKey: @8.5,
+            CBCbonsaiMessageKey: @" quiet bonsai ",
+            CBCbonsaiBaseEnabledKey: @YES,
+            CBCbonsaiBaseKey: @0,
+            CBCbonsaiLeafKey: @"&,o,@",
+            CBCbonsaiColorKey: @"22,94,40,82",
+            CBCbonsaiMultiplierKey: @13,
+            CBCbonsaiLifeKey: @144,
+            CBCbonsaiPrintKey: @YES,
+            CBCbonsaiSeedEnabledKey: @YES,
+            CBCbonsaiSeedKey: @12345,
+            CBCbonsaiSaveEnabledKey: @YES,
+            CBCbonsaiSavePathKey: @" /tmp/cbonsai-save ",
+            CBCbonsaiLoadEnabledKey: @YES,
+            CBCbonsaiLoadPathKey: @" /tmp/cbonsai-load ",
+            CBCbonsaiVerboseKey: @YES,
+            CBCbonsaiHelpKey: @YES,
+        }, (@[
+            @"--live",
+            @"--infinite",
+            @"--time=0.12",
+            @"--wait=8.5",
+            @"--message=quiet bonsai",
+            @"--base=0",
+            @"--leaf=&,o,@",
+            @"--color=22,94,40,82",
+            @"--multiplier=13",
+            @"--life=144",
+            @"--print",
+            @"--seed=12345",
+            @"--save=/tmp/cbonsai-save",
+            @"--load=/tmp/cbonsai-load",
+            @"--verbose",
+            @"--help",
+        ]));
     }
 
     return 0;

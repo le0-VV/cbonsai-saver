@@ -21,11 +21,12 @@
 
 static NSString * const CBSettingsModuleName = @"wang.leonard.cbonsai-saver";
 static NSString * const CBExecutablePathKey = @"executablePath";
-static NSString * const CBArgumentStringKey = @"argumentString";
 static NSString * const CBFontSizeKey = @"fontSize";
 static const CGFloat CBDefaultFontSize = 14.0;
 static const NSInteger CBDefaultForegroundColor = 7;
 static const NSInteger CBDefaultBackgroundColor = -1;
+static const CGFloat CBConfigurationSheetWidth = 720.0;
+static const CGFloat CBConfigurationSheetHeight = 620.0;
 
 typedef struct {
     unichar character;
@@ -171,6 +172,18 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     CBParserStateCSI,
     CBParserStateCharset,
 };
+
+@interface CBFlippedView : NSView
+@end
+
+@implementation CBFlippedView
+
+- (BOOL)isFlipped
+{
+    return YES;
+}
+
+@end
 
 @interface CBTerminalBuffer : NSObject
 
@@ -642,9 +655,33 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic) BOOL stoppingChildProcess;
 @property (nonatomic, strong) NSWindow *configurationSheet;
 @property (nonatomic, strong) NSTextField *executableField;
-@property (nonatomic, strong) NSTextField *argumentsField;
 @property (nonatomic, strong) NSTextField *fontSizeField;
 @property (nonatomic, strong) NSStepper *fontSizeStepper;
+@property (nonatomic, strong) NSButton *screensaverButton;
+@property (nonatomic, strong) NSButton *liveButton;
+@property (nonatomic, strong) NSButton *infiniteButton;
+@property (nonatomic, strong) NSTextField *timeField;
+@property (nonatomic, strong) NSStepper *timeStepper;
+@property (nonatomic, strong) NSTextField *waitField;
+@property (nonatomic, strong) NSStepper *waitStepper;
+@property (nonatomic, strong) NSTextField *messageField;
+@property (nonatomic, strong) NSButton *baseEnabledButton;
+@property (nonatomic, strong) NSTextField *baseField;
+@property (nonatomic, strong) NSTextField *leafField;
+@property (nonatomic, strong) NSTextField *colorField;
+@property (nonatomic, strong) NSTextField *multiplierField;
+@property (nonatomic, strong) NSStepper *multiplierStepper;
+@property (nonatomic, strong) NSTextField *lifeField;
+@property (nonatomic, strong) NSStepper *lifeStepper;
+@property (nonatomic, strong) NSButton *printButton;
+@property (nonatomic, strong) NSButton *seedEnabledButton;
+@property (nonatomic, strong) NSTextField *seedField;
+@property (nonatomic, strong) NSButton *saveEnabledButton;
+@property (nonatomic, strong) NSTextField *savePathField;
+@property (nonatomic, strong) NSButton *loadEnabledButton;
+@property (nonatomic, strong) NSTextField *loadPathField;
+@property (nonatomic, strong) NSButton *verboseButton;
+@property (nonatomic, strong) NSButton *helpButton;
 
 @end
 
@@ -726,7 +763,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (NSWindow *)configureSheet
 {
     if (self.configurationSheet == nil) {
-        self.configurationSheet = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 520, 188)
+        self.configurationSheet = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, CBConfigurationSheetWidth, CBConfigurationSheetHeight)
                                                               styleMask:NSWindowStyleMaskTitled
                                                                 backing:NSBackingStoreBuffered
                                                                   defer:NO];
@@ -741,11 +778,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (ScreenSaverDefaults *)screenSaverDefaults
 {
     ScreenSaverDefaults *defaults = [ScreenSaverDefaults defaultsForModuleWithName:CBSettingsModuleName];
-    [defaults registerDefaults:@{
+    NSMutableDictionary<NSString *, id> *registeredDefaults = [@{
         CBExecutablePathKey: CBDefaultExecutablePath(),
-        CBArgumentStringKey: CBDefaultArgumentString(),
         CBFontSizeKey: @(CBDefaultFontSize),
-    }];
+    } mutableCopy];
+    [registeredDefaults addEntriesFromDictionary:CBDefaultCbonsaiOptions()];
+    [defaults registerDefaults:registeredDefaults];
     return defaults;
 }
 
@@ -760,10 +798,17 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return (path.length > 0) ? path : CBDefaultExecutablePath();
 }
 
-- (NSString *)configuredArgumentString
+- (NSDictionary<NSString *, id> *)configuredCbonsaiOptions
 {
-    NSString *arguments = [[self screenSaverDefaults] stringForKey:CBArgumentStringKey];
-    return (arguments != nil) ? arguments : CBDefaultArgumentString();
+    ScreenSaverDefaults *defaults = [self screenSaverDefaults];
+    NSMutableDictionary<NSString *, id> *options = [CBDefaultCbonsaiOptions() mutableCopy];
+    for (NSString *key in CBDefaultCbonsaiOptions()) {
+        id value = [defaults objectForKey:key];
+        if (value != nil) {
+            options[key] = value;
+        }
+    }
+    return options;
 }
 
 - (CGFloat)configuredFontSize
@@ -832,13 +877,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return;
     }
 
-    NSError *parseError = nil;
-    NSArray<NSString *> *arguments = CBParseArgumentString(self.configuredArgumentString, &parseError);
-    if (arguments == nil) {
-        [self.terminalBuffer showStatusMessage:parseError.localizedDescription];
-        [self setNeedsDisplay:YES];
-        return;
-    }
+    NSArray<NSString *> *arguments = CBCbonsaiArgumentsFromOptions(self.configuredCbonsaiOptions);
 
     char **shellArgv = [self createShellArgvWithArguments:arguments];
     char **shellEnvironment = [self createShellEnvironmentWithExecutablePath:executablePath];
@@ -1073,43 +1112,100 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 {
     NSView *contentView = self.configurationSheet.contentView;
 
-    NSTextField *executableLabel = [NSTextField labelWithString:@"Executable"];
-    executableLabel.frame = NSMakeRect(20, 134, 110, 24);
-    [contentView addSubview:executableLabel];
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(20, 66, CBConfigurationSheetWidth - 40, CBConfigurationSheetHeight - 88)];
+    scrollView.hasVerticalScroller = YES;
+    scrollView.autohidesScrollers = YES;
+    scrollView.borderType = NSNoBorder;
+    [contentView addSubview:scrollView];
 
-    self.executableField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, 132, 370, 24)];
-    [contentView addSubview:self.executableField];
+    CGFloat documentWidth = NSWidth(scrollView.frame) - 18.0;
+    CBFlippedView *documentView = [[CBFlippedView alloc] initWithFrame:NSMakeRect(0, 0, documentWidth, 790)];
+    scrollView.documentView = documentView;
 
-    NSTextField *argumentsLabel = [NSTextField labelWithString:@"Arguments"];
-    argumentsLabel.frame = NSMakeRect(20, 94, 110, 24);
-    [contentView addSubview:argumentsLabel];
+    CGFloat y = 18.0;
+    CGFloat labelX = 20.0;
+    CGFloat fieldX = 190.0;
+    CGFloat fieldWidth = documentWidth - fieldX - 20.0;
 
-    self.argumentsField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, 92, 370, 24)];
-    [contentView addSubview:self.argumentsField];
+    y = [self addSectionTitle:@"General" toView:documentView y:y];
+    [self addLabel:@"Executable" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
+    self.executableField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
+    y += 38.0;
 
-    NSTextField *fontSizeLabel = [NSTextField labelWithString:@"Font size"];
-    fontSizeLabel.frame = NSMakeRect(20, 54, 110, 24);
-    [contentView addSubview:fontSizeLabel];
+    [self addLabel:@"Font size" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
+    self.fontSizeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 72, 24)];
+    self.fontSizeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 80, y - 4, 20, 28) min:8.0 max:48.0 increment:1.0];
+    y += 48.0;
 
-    self.fontSizeField = [[NSTextField alloc] initWithFrame:NSMakeRect(130, 52, 72, 24)];
-    [contentView addSubview:self.fontSizeField];
+    y = [self addSectionTitle:@"Mode" toView:documentView y:y];
+    self.screensaverButton = [self addCheckbox:@"Screensaver (--screensaver)" toView:documentView frame:NSMakeRect(labelX, y - 2, 230, 24)];
+    self.liveButton = [self addCheckbox:@"Live (--live)" toView:documentView frame:NSMakeRect(labelX + 240, y - 2, 150, 24)];
+    self.infiniteButton = [self addCheckbox:@"Infinite (--infinite)" toView:documentView frame:NSMakeRect(labelX + 400, y - 2, 190, 24)];
+    y += 42.0;
 
-    self.fontSizeStepper = [[NSStepper alloc] initWithFrame:NSMakeRect(210, 50, 20, 28)];
-    self.fontSizeStepper.minValue = 8.0;
-    self.fontSizeStepper.maxValue = 48.0;
-    self.fontSizeStepper.increment = 1.0;
-    self.fontSizeStepper.target = self;
-    self.fontSizeStepper.action = @selector(fontSizeStepperChanged:);
-    [contentView addSubview:self.fontSizeStepper];
+    y = [self addSectionTitle:@"Timing" toView:documentView y:y];
+    [self addLabel:@"Growth time (--time)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    self.timeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
+    self.timeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.01 max:60.0 increment:0.01];
+    y += 34.0;
 
-    NSButton *cancelButton = [[NSButton alloc] initWithFrame:NSMakeRect(320, 14, 90, 30)];
+    [self addLabel:@"Tree wait (--wait)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    self.waitField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
+    self.waitStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:600.0 increment:0.25];
+    y += 48.0;
+
+    y = [self addSectionTitle:@"Tree" toView:documentView y:y];
+    [self addLabel:@"Message (--message)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    self.messageField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
+    y += 34.0;
+
+    self.baseEnabledButton = [self addCheckbox:@"Base (--base)" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
+    self.baseField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
+    y += 34.0;
+
+    [self addLabel:@"Leaves (--leaf)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    self.leafField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
+    y += 34.0;
+
+    [self addLabel:@"Colors (--color)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    self.colorField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
+    y += 34.0;
+
+    [self addLabel:@"Multiplier (--multiplier)" toView:documentView frame:NSMakeRect(labelX, y, 170, 24)];
+    self.multiplierField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
+    self.multiplierStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:20.0 increment:1.0];
+    y += 34.0;
+
+    [self addLabel:@"Life (--life)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    self.lifeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
+    self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:200.0 increment:1.0];
+    y += 48.0;
+
+    y = [self addSectionTitle:@"Output" toView:documentView y:y];
+    self.printButton = [self addCheckbox:@"Print when finished (--print)" toView:documentView frame:NSMakeRect(labelX, y - 2, 250, 24)];
+    self.verboseButton = [self addCheckbox:@"Verbose (--verbose)" toView:documentView frame:NSMakeRect(labelX + 260, y - 2, 180, 24)];
+    self.helpButton = [self addCheckbox:@"Show help (--help)" toView:documentView frame:NSMakeRect(labelX + 450, y - 2, 180, 24)];
+    y += 34.0;
+
+    self.seedEnabledButton = [self addCheckbox:@"Seed (--seed)" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
+    self.seedField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 120, 24)];
+    y += 34.0;
+
+    self.saveEnabledButton = [self addCheckbox:@"Save file (--save)" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
+    self.savePathField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
+    y += 34.0;
+
+    self.loadEnabledButton = [self addCheckbox:@"Load file (--load)" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
+    self.loadPathField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
+
+    NSButton *cancelButton = [[NSButton alloc] initWithFrame:NSMakeRect(CBConfigurationSheetWidth - 220, 18, 90, 30)];
     cancelButton.title = @"Cancel";
     cancelButton.bezelStyle = NSBezelStyleRounded;
     cancelButton.target = self;
     cancelButton.action = @selector(cancelConfiguration:);
     [contentView addSubview:cancelButton];
 
-    NSButton *okButton = [[NSButton alloc] initWithFrame:NSMakeRect(420, 14, 80, 30)];
+    NSButton *okButton = [[NSButton alloc] initWithFrame:NSMakeRect(CBConfigurationSheetWidth - 120, 18, 90, 30)];
     okButton.title = @"OK";
     okButton.bezelStyle = NSBezelStyleRounded;
     okButton.keyEquivalent = @"\r";
@@ -1118,28 +1214,113 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [contentView addSubview:okButton];
 }
 
-- (void)loadConfigurationFields
+- (CGFloat)addSectionTitle:(NSString *)title toView:(NSView *)view y:(CGFloat)y
 {
-    self.executableField.stringValue = self.configuredExecutablePath;
-    self.argumentsField.stringValue = self.configuredArgumentString;
-    self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
-    self.fontSizeStepper.doubleValue = self.configuredFontSize;
+    NSTextField *label = [NSTextField labelWithString:title];
+    label.font = [NSFont boldSystemFontOfSize:13.0];
+    label.frame = NSMakeRect(20, y, NSWidth(view.bounds) - 40, 20);
+    [view addSubview:label];
+    return y + 28.0;
 }
 
-- (void)fontSizeStepperChanged:(id)sender
+- (void)addLabel:(NSString *)title toView:(NSView *)view frame:(NSRect)frame
 {
-    self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.fontSizeStepper.doubleValue];
+    NSTextField *label = [NSTextField labelWithString:title];
+    label.frame = frame;
+    [view addSubview:label];
+}
+
+- (NSTextField *)addTextFieldToView:(NSView *)view frame:(NSRect)frame
+{
+    NSTextField *field = [[NSTextField alloc] initWithFrame:frame];
+    [view addSubview:field];
+    return field;
+}
+
+- (NSButton *)addCheckbox:(NSString *)title toView:(NSView *)view frame:(NSRect)frame
+{
+    NSButton *button = [NSButton checkboxWithTitle:title target:self action:@selector(optionCheckboxChanged:)];
+    button.frame = frame;
+    [view addSubview:button];
+    return button;
+}
+
+- (NSStepper *)addStepperToView:(NSView *)view frame:(NSRect)frame min:(double)minimum max:(double)maximum increment:(double)increment
+{
+    NSStepper *stepper = [[NSStepper alloc] initWithFrame:frame];
+    stepper.minValue = minimum;
+    stepper.maxValue = maximum;
+    stepper.increment = increment;
+    stepper.target = self;
+    stepper.action = @selector(optionStepperChanged:);
+    [view addSubview:stepper];
+    return stepper;
+}
+
+- (void)loadConfigurationFields
+{
+    NSDictionary<NSString *, id> *options = self.configuredCbonsaiOptions;
+    self.executableField.stringValue = self.configuredExecutablePath;
+    self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
+    self.fontSizeStepper.doubleValue = self.configuredFontSize;
+
+    self.screensaverButton.state = [self boolOption:options key:CBCbonsaiScreensaverKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.liveButton.state = [self boolOption:options key:CBCbonsaiLiveKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.infiniteButton.state = [self boolOption:options key:CBCbonsaiInfiniteKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    [self setDoubleField:self.timeField stepper:self.timeStepper value:[self doubleOption:options key:CBCbonsaiTimeKey]];
+    [self setDoubleField:self.waitField stepper:self.waitStepper value:[self doubleOption:options key:CBCbonsaiWaitKey]];
+    self.messageField.stringValue = [self stringOption:options key:CBCbonsaiMessageKey];
+    self.baseEnabledButton.state = [self boolOption:options key:CBCbonsaiBaseEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.baseField.stringValue = [NSString stringWithFormat:@"%ld", (long)[self integerOption:options key:CBCbonsaiBaseKey]];
+    self.leafField.stringValue = [self stringOption:options key:CBCbonsaiLeafKey];
+    self.colorField.stringValue = [self stringOption:options key:CBCbonsaiColorKey];
+    [self setIntegerField:self.multiplierField stepper:self.multiplierStepper value:[self integerOption:options key:CBCbonsaiMultiplierKey]];
+    [self setIntegerField:self.lifeField stepper:self.lifeStepper value:[self integerOption:options key:CBCbonsaiLifeKey]];
+    self.printButton.state = [self boolOption:options key:CBCbonsaiPrintKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.seedEnabledButton.state = [self boolOption:options key:CBCbonsaiSeedEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.seedField.stringValue = [NSString stringWithFormat:@"%ld", (long)[self integerOption:options key:CBCbonsaiSeedKey]];
+    self.saveEnabledButton.state = [self boolOption:options key:CBCbonsaiSaveEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.savePathField.stringValue = [self stringOption:options key:CBCbonsaiSavePathKey];
+    self.loadEnabledButton.state = [self boolOption:options key:CBCbonsaiLoadEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.loadPathField.stringValue = [self stringOption:options key:CBCbonsaiLoadPathKey];
+    self.verboseButton.state = [self boolOption:options key:CBCbonsaiVerboseKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    self.helpButton.state = [self boolOption:options key:CBCbonsaiHelpKey] ? NSControlStateValueOn : NSControlStateValueOff;
+    [self updateOptionalFieldStates];
 }
 
 - (void)saveConfiguration:(id)sender
 {
     CGFloat fontSize = self.fontSizeField.doubleValue;
     fontSize = MIN(MAX(fontSize, 8.0), 48.0);
+    double time = MAX(self.timeField.doubleValue, 0.01);
+    double wait = MAX(self.waitField.doubleValue, 0.0);
+    NSInteger multiplier = MIN(MAX(self.multiplierField.integerValue, 0), 20);
+    NSInteger life = MIN(MAX(self.lifeField.integerValue, 0), 200);
 
     ScreenSaverDefaults *defaults = [self screenSaverDefaults];
     [defaults setObject:self.executableField.stringValue forKey:CBExecutablePathKey];
-    [defaults setObject:self.argumentsField.stringValue forKey:CBArgumentStringKey];
     [defaults setDouble:fontSize forKey:CBFontSizeKey];
+    [defaults setBool:self.screensaverButton.state == NSControlStateValueOn forKey:CBCbonsaiScreensaverKey];
+    [defaults setBool:self.liveButton.state == NSControlStateValueOn forKey:CBCbonsaiLiveKey];
+    [defaults setBool:self.infiniteButton.state == NSControlStateValueOn forKey:CBCbonsaiInfiniteKey];
+    [defaults setDouble:time forKey:CBCbonsaiTimeKey];
+    [defaults setDouble:wait forKey:CBCbonsaiWaitKey];
+    [defaults setObject:[self trimmedStringFromField:self.messageField] forKey:CBCbonsaiMessageKey];
+    [defaults setBool:self.baseEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiBaseEnabledKey];
+    [defaults setInteger:self.baseField.integerValue forKey:CBCbonsaiBaseKey];
+    [defaults setObject:[self trimmedStringFromField:self.leafField] forKey:CBCbonsaiLeafKey];
+    [defaults setObject:[self trimmedStringFromField:self.colorField] forKey:CBCbonsaiColorKey];
+    [defaults setInteger:multiplier forKey:CBCbonsaiMultiplierKey];
+    [defaults setInteger:life forKey:CBCbonsaiLifeKey];
+    [defaults setBool:self.printButton.state == NSControlStateValueOn forKey:CBCbonsaiPrintKey];
+    [defaults setBool:self.seedEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiSeedEnabledKey];
+    [defaults setInteger:self.seedField.integerValue forKey:CBCbonsaiSeedKey];
+    [defaults setBool:self.saveEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiSaveEnabledKey];
+    [defaults setObject:[self trimmedStringFromField:self.savePathField] forKey:CBCbonsaiSavePathKey];
+    [defaults setBool:self.loadEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiLoadEnabledKey];
+    [defaults setObject:[self trimmedStringFromField:self.loadPathField] forKey:CBCbonsaiLoadPathKey];
+    [defaults setBool:self.verboseButton.state == NSControlStateValueOn forKey:CBCbonsaiVerboseKey];
+    [defaults setBool:self.helpButton.state == NSControlStateValueOn forKey:CBCbonsaiHelpKey];
     [defaults synchronize];
 
     self.terminalFont = nil;
@@ -1150,6 +1331,75 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
 
     [[NSApplication sharedApplication] endSheet:self.configurationSheet];
+}
+
+- (void)optionStepperChanged:(id)sender
+{
+    if (sender == self.fontSizeStepper) {
+        self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.fontSizeStepper.doubleValue];
+    } else if (sender == self.timeStepper) {
+        self.timeField.stringValue = [NSString stringWithFormat:@"%.2f", self.timeStepper.doubleValue];
+    } else if (sender == self.waitStepper) {
+        self.waitField.stringValue = [NSString stringWithFormat:@"%.2f", self.waitStepper.doubleValue];
+    } else if (sender == self.multiplierStepper) {
+        self.multiplierField.stringValue = [NSString stringWithFormat:@"%.0f", self.multiplierStepper.doubleValue];
+    } else if (sender == self.lifeStepper) {
+        self.lifeField.stringValue = [NSString stringWithFormat:@"%.0f", self.lifeStepper.doubleValue];
+    }
+}
+
+- (void)optionCheckboxChanged:(id)sender
+{
+    [self updateOptionalFieldStates];
+}
+
+- (void)updateOptionalFieldStates
+{
+    self.baseField.enabled = self.baseEnabledButton.state == NSControlStateValueOn;
+    self.seedField.enabled = self.seedEnabledButton.state == NSControlStateValueOn;
+    self.savePathField.enabled = self.saveEnabledButton.state == NSControlStateValueOn;
+    self.loadPathField.enabled = self.loadEnabledButton.state == NSControlStateValueOn;
+}
+
+- (BOOL)boolOption:(NSDictionary<NSString *, id> *)options key:(NSString *)key
+{
+    id value = options[key];
+    return [value respondsToSelector:@selector(boolValue)] && [value boolValue];
+}
+
+- (NSInteger)integerOption:(NSDictionary<NSString *, id> *)options key:(NSString *)key
+{
+    id value = options[key];
+    return [value respondsToSelector:@selector(integerValue)] ? [value integerValue] : 0;
+}
+
+- (double)doubleOption:(NSDictionary<NSString *, id> *)options key:(NSString *)key
+{
+    id value = options[key];
+    return [value respondsToSelector:@selector(doubleValue)] ? [value doubleValue] : 0.0;
+}
+
+- (NSString *)stringOption:(NSDictionary<NSString *, id> *)options key:(NSString *)key
+{
+    id value = options[key];
+    return [value isKindOfClass:NSString.class] ? value : @"";
+}
+
+- (void)setDoubleField:(NSTextField *)field stepper:(NSStepper *)stepper value:(double)value
+{
+    field.stringValue = [NSString stringWithFormat:@"%.6g", value];
+    stepper.doubleValue = value;
+}
+
+- (void)setIntegerField:(NSTextField *)field stepper:(NSStepper *)stepper value:(NSInteger)value
+{
+    field.stringValue = [NSString stringWithFormat:@"%ld", (long)value];
+    stepper.integerValue = value;
+}
+
+- (NSString *)trimmedStringFromField:(NSTextField *)field
+{
+    return [field.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
 }
 
 - (void)cancelConfiguration:(id)sender
