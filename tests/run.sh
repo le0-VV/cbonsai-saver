@@ -30,12 +30,48 @@ MANUAL_PATH="cbonsai saver/cbonsai saver/cbonsai-manual.html"
 VIEW_PATH="cbonsai saver/cbonsai saver/cbonsai_saverView.m"
 PROJECT_PATH="cbonsai saver/cbonsai saver.xcodeproj/project.pbxproj"
 BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
+RELEASE_SCRIPT_PATH="scripts/package-release.sh"
+FORMULA_PATH="Formula/cbonsai-saver.rb"
+HOMEBREW_DOC_PATH="HOMEBREW.md"
 if [ ! -f "$MANUAL_PATH" ]; then
   echo "Missing bundled cbonsai manual: $MANUAL_PATH" >&2
   exit 1
 fi
 
 sh -n "$BUNDLE_SCRIPT_PATH"
+sh -n "$RELEASE_SCRIPT_PATH"
+
+if [ ! -f "$FORMULA_PATH" ]; then
+  echo "Missing Homebrew formula: $FORMULA_PATH" >&2
+  exit 1
+fi
+
+if [ ! -f "$HOMEBREW_DOC_PATH" ]; then
+  echo "Missing Homebrew tap documentation: $HOMEBREW_DOC_PATH" >&2
+  exit 1
+fi
+
+if ! grep -Fq 'releases/download/1.0/cbonsai-saver-1.0.zip' "$FORMULA_PATH"; then
+  echo "Homebrew formula should install the 1.0 release zip." >&2
+  exit 1
+fi
+
+if grep -Fq 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$FORMULA_PATH"; then
+  echo "Homebrew formula SHA-256 must be set before release." >&2
+  exit 1
+fi
+
+for formula_text in \
+  'class CbonsaiSaver < Formula' \
+  'depends_on arch: :arm64' \
+  '(prefix/"Screen Savers").install "cbonsai saver.saver"' \
+  'assert_path_exists prefix/"Screen Savers/cbonsai saver.saver/Contents/Resources/cbonsai"'
+do
+  if ! grep -Fq "$formula_text" "$FORMULA_PATH"; then
+    echo "Missing Homebrew formula text: $formula_text" >&2
+    exit 1
+  fi
+done
 
 if grep -Fq 'addLabel:@"Executable"' "$VIEW_PATH"; then
   echo "Executable setting should not be present in the configuration sheet." >&2
