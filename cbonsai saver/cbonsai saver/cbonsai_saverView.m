@@ -7,6 +7,7 @@
 
 #import "cbonsai_saverView.h"
 #import "CBCommandLine.h"
+#import "CBTerminalGeometry.h"
 
 #import <dispatch/dispatch.h>
 #import <errno.h>
@@ -20,10 +21,8 @@
 #import <util.h>
 
 static NSString * const CBSettingsModuleName = @"wang.leonard.cbonsai-saver";
-static NSString * const CBFontSizeKey = @"fontSize";
 static NSString * const CBLegacyScreensaverKey = @"cbonsaiScreensaver";
 static NSString * const CBModeDefaultsMigrationKey = @"modeDefaultsMigrated";
-static const CGFloat CBDefaultFontSize = 14.0;
 static const NSInteger CBDefaultForegroundColor = 7;
 static const NSInteger CBDefaultBackgroundColor = -1;
 static const CGFloat CBConfigurationSheetWidth = 720.0;
@@ -658,8 +657,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic) pid_t childProcessIdentifier;
 @property (nonatomic) BOOL stoppingChildProcess;
 @property (nonatomic, strong) NSWindow *configurationSheet;
-@property (nonatomic, strong) NSTextField *fontSizeField;
-@property (nonatomic, strong) NSStepper *fontSizeStepper;
 @property (nonatomic, strong) NSTextField *timeField;
 @property (nonatomic, strong) NSStepper *timeStepper;
 @property (nonatomic, strong) NSTextField *waitField;
@@ -778,9 +775,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (ScreenSaverDefaults *)screenSaverDefaults
 {
     ScreenSaverDefaults *defaults = [ScreenSaverDefaults defaultsForModuleWithName:CBSettingsModuleName];
-    NSMutableDictionary<NSString *, id> *registeredDefaults = [@{
-        CBFontSizeKey: @(CBDefaultFontSize),
-    } mutableCopy];
+    NSMutableDictionary<NSString *, id> *registeredDefaults = [NSMutableDictionary dictionary];
     [registeredDefaults addEntriesFromDictionary:CBDefaultCbonsaiOptions()];
     [defaults registerDefaults:registeredDefaults];
     [self migrateModeDefaultsIfNeeded:defaults];
@@ -822,26 +817,20 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return options;
 }
 
-- (CGFloat)configuredFontSize
+- (CGFloat)automaticFontSize
 {
-    CGFloat fontSize = [[self screenSaverDefaults] doubleForKey:CBFontSizeKey];
-    if (fontSize < 8.0 || fontSize > 48.0) {
-        return CBDefaultFontSize;
-    }
-    return fontSize;
+    NSFont *onePointFont = [self terminalFontWithSize:1.0];
+    return CBAutomaticTerminalFontSizeForBounds(self.bounds.size, [self cellSizeForFont:onePointFont], self.isPreview);
 }
 
 - (void)updateTerminalGeometry
 {
-    CGFloat fontSize = [self configuredFontSize];
+    CGFloat fontSize = [self automaticFontSize];
     if (self.terminalFont == nil || fabs(self.terminalFont.pointSize - fontSize) > 0.1) {
-        self.terminalFont = [NSFont userFixedPitchFontOfSize:fontSize];
-        if (self.terminalFont == nil) {
-            self.terminalFont = [NSFont monospacedSystemFontOfSize:fontSize weight:NSFontWeightRegular];
-        }
-        NSDictionary<NSAttributedStringKey, id> *attributes = @{NSFontAttributeName: self.terminalFont};
-        self.cellWidth = ceil([@"W" sizeWithAttributes:attributes].width);
-        self.cellHeight = ceil(self.terminalFont.ascender - self.terminalFont.descender + self.terminalFont.leading);
+        self.terminalFont = [self terminalFontWithSize:fontSize];
+        CGSize cellSize = [self cellSizeForFont:self.terminalFont];
+        self.cellWidth = ceil(cellSize.width);
+        self.cellHeight = ceil(cellSize.height);
     }
 
     if (self.cellWidth <= 0.0 || self.cellHeight <= 0.0 || NSWidth(self.bounds) <= 0.0 || NSHeight(self.bounds) <= 0.0) {
@@ -858,6 +847,19 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
 
     [self updatePtyWindowSize];
+}
+
+- (NSFont *)terminalFontWithSize:(CGFloat)fontSize
+{
+    NSFont *font = [NSFont userFixedPitchFontOfSize:fontSize];
+    return font ?: [NSFont monospacedSystemFontOfSize:fontSize weight:NSFontWeightRegular];
+}
+
+- (CGSize)cellSizeForFont:(NSFont *)font
+{
+    NSDictionary<NSAttributedStringKey, id> *attributes = @{NSFontAttributeName: font};
+    return CGSizeMake([@"W" sizeWithAttributes:attributes].width,
+                      font.ascender - font.descender + font.leading);
 }
 
 - (void)updatePtyWindowSize
@@ -1146,14 +1148,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     CGFloat fieldWidth = helpButtonX - fieldX - CBHelpButtonGap;
     CGFloat compactHelpX = fieldX + 118.0;
 
-    y = [self addSectionTitle:@"General" toView:documentView y:y];
-    NSTextField *fontSizeLabel = [self addLabel:@"Font size" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
-    self.fontSizeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 72, 24)];
-    self.fontSizeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 80, y - 4, 20, 28) min:8.0 max:48.0 increment:1.0];
-    [self setToolTip:@"Terminal font size." forViews:@[fontSizeLabel, self.fontSizeField, self.fontSizeStepper]];
-    [self addHelpButtonForAnchor:@"font-size" toView:documentView frame:NSMakeRect(fieldX + 108.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 48.0;
-
     y = [self addSectionTitle:@"Timing" toView:documentView y:y];
     NSTextField *timeLabel = [self addLabel:@"Growth time (--time)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.timeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
@@ -1318,8 +1312,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)loadConfigurationFields
 {
     NSDictionary<NSString *, id> *options = self.configuredCbonsaiOptions;
-    self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
-    self.fontSizeStepper.doubleValue = self.configuredFontSize;
 
     [self setDoubleField:self.timeField stepper:self.timeStepper value:[self doubleOption:options key:CBCbonsaiTimeKey]];
     [self setDoubleField:self.waitField stepper:self.waitStepper value:[self doubleOption:options key:CBCbonsaiWaitKey]];
@@ -1344,15 +1336,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)saveConfiguration:(id)sender
 {
-    CGFloat fontSize = self.fontSizeField.doubleValue;
-    fontSize = MIN(MAX(fontSize, 8.0), 48.0);
     double time = MAX(self.timeField.doubleValue, 0.01);
     double wait = MAX(self.waitField.doubleValue, 0.0);
     NSInteger multiplier = MIN(MAX(self.multiplierField.integerValue, 0), 20);
     NSInteger life = MIN(MAX(self.lifeField.integerValue, 0), 200);
 
     ScreenSaverDefaults *defaults = [self screenSaverDefaults];
-    [defaults setDouble:fontSize forKey:CBFontSizeKey];
     [defaults setDouble:time forKey:CBCbonsaiTimeKey];
     [defaults setDouble:wait forKey:CBCbonsaiWaitKey];
     [defaults setObject:[self trimmedStringFromField:self.messageField] forKey:CBCbonsaiMessageKey];
@@ -1385,9 +1374,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)optionStepperChanged:(id)sender
 {
-    if (sender == self.fontSizeStepper) {
-        self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.fontSizeStepper.doubleValue];
-    } else if (sender == self.timeStepper) {
+    if (sender == self.timeStepper) {
         self.timeField.stringValue = [NSString stringWithFormat:@"%.2f", self.timeStepper.doubleValue];
     } else if (sender == self.waitStepper) {
         self.waitField.stringValue = [NSString stringWithFormat:@"%.2f", self.waitStepper.doubleValue];

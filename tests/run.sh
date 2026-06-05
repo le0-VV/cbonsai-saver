@@ -16,6 +16,16 @@ clang \
 
 "$BUILD_DIR/CBCommandLineTests"
 
+clang \
+  -fobjc-arc \
+  -framework Foundation \
+  -I"cbonsai saver/cbonsai saver" \
+  "cbonsai saver/cbonsai saver/CBTerminalGeometry.m" \
+  tests/CBTerminalGeometryTests.m \
+  -o "$BUILD_DIR/CBTerminalGeometryTests"
+
+"$BUILD_DIR/CBTerminalGeometryTests"
+
 MANUAL_PATH="cbonsai saver/cbonsai saver/cbonsai-manual.html"
 VIEW_PATH="cbonsai saver/cbonsai saver/cbonsai_saverView.m"
 PROJECT_PATH="cbonsai saver/cbonsai saver.xcodeproj/project.pbxproj"
@@ -29,6 +39,11 @@ sh -n "$BUNDLE_SCRIPT_PATH"
 
 if grep -Fq 'addLabel:@"Executable"' "$VIEW_PATH"; then
   echo "Executable setting should not be present in the configuration sheet." >&2
+  exit 1
+fi
+
+if grep -Fq 'addLabel:@"Font size"' "$VIEW_PATH" || grep -Fq 'CBFontSizeKey' "$VIEW_PATH" || grep -Fq 'fontSizeField' "$VIEW_PATH"; then
+  echo "Font size should be automatic, not exposed as a setting." >&2
   exit 1
 fi
 
@@ -63,7 +78,6 @@ if ! grep -Fq "Bundle cbonsai" "$PROJECT_PATH" || ! grep -Fq "bundle-cbonsai.sh"
 fi
 
 for anchor in \
-  font-size \
   time \
   wait \
   message \
@@ -85,6 +99,11 @@ do
   fi
 done
 
+if grep -Fq 'id="font-size"' "$MANUAL_PATH"; then
+  echo "Font size should not have a setting manual anchor." >&2
+  exit 1
+fi
+
 while IFS= read -r tooltip
 do
   if [ -z "$tooltip" ]; then
@@ -96,7 +115,6 @@ do
     exit 1
   fi
 done <<'EOF'
-Terminal font size.
 Growth delay in seconds.
 Delay after each tree.
 Text rendered with the tree.
