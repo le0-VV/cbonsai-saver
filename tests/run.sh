@@ -108,8 +108,8 @@ if grep -Fq 'GITHUB_ENV' "$CI_WORKFLOW_PATH"; then
   exit 1
 fi
 
-if ! grep -Fq 'releases/download/1.0/cbonsai-saver-1.0.zip' "$FORMULA_PATH"; then
-  echo "Homebrew formula should install the 1.0 release zip." >&2
+if ! grep -Fq 'releases/download/1.1/cbonsai-saver-1.1.zip' "$FORMULA_PATH"; then
+  echo "Homebrew formula should install the 1.1 release zip." >&2
   exit 1
 fi
 
