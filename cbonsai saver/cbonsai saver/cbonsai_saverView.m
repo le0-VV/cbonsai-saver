@@ -26,12 +26,16 @@ static NSString * const CBLegacyScreensaverKey = @"cbonsaiScreensaver";
 static NSString * const CBModeDefaultsMigrationKey = @"modeDefaultsMigrated";
 static const NSInteger CBDefaultForegroundColor = 7;
 static const NSInteger CBDefaultBackgroundColor = -1;
-static const NSUInteger CBMinimumTerminalColumns = 40;
-static const NSUInteger CBMinimumTerminalRows = 12;
-static const NSUInteger CBMaximumTerminalColumns = 220;
-static const NSUInteger CBMaximumTerminalRows = 80;
-static const NSUInteger CBMaximumCSIParameterLength = 64;
-static const NSUInteger CBMaximumCSIParameterCount = 16;
+enum {
+    CBMinimumTerminalColumns = 40,
+    CBMinimumTerminalRows = 12,
+    CBMaximumTerminalColumns = 220,
+    CBMaximumTerminalRows = 80,
+    CBMaximumCSIParameterLength = 64,
+    CBMaximumCSIParameterCount = 16,
+};
+static const NSTimeInterval CBIdleAnimationTimeInterval = 1.0;
+static const NSTimeInterval CBTerminalDataFlushInterval = 1.0 / 30.0;
 static const CGFloat CBConfigurationSheetWidth = 720.0;
 static const CGFloat CBConfigurationSheetHeight = 620.0;
 static NSString * const CBManualResourceName = @"cbonsai-manual";
@@ -49,6 +53,11 @@ typedef struct {
     NSInteger backgroundColor;
     BOOL bold;
 } CBTerminalCell;
+
+typedef struct {
+    CGRect contentBounds;
+    CGRect bottomContentBounds;
+} CBTerminalContentMetrics;
 
 static CBTerminalCell CBTerminalDefaultCell(void)
 {
@@ -316,8 +325,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)resizeToColumns:(NSUInteger)columns rows:(NSUInteger)rows;
 - (void)appendData:(NSData *)data;
 - (CBTerminalCell)cellAtColumn:(NSUInteger)column row:(NSUInteger)row;
-- (CGRect)contentBounds;
-- (CGRect)bottomContentBounds;
+- (const CBTerminalCell *)cellsForRow:(NSUInteger)row;
+- (CBTerminalContentMetrics)contentMetrics;
 - (void)showStatusMessage:(NSString *)message;
 
 @end
@@ -416,13 +425,28 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return _cells[row * _columns + column];
 }
 
-- (CGRect)contentBounds
+- (const CBTerminalCell *)cellsForRow:(NSUInteger)row
 {
+    if (row >= _rows) {
+        return NULL;
+    }
+    return _cells + row * _columns;
+}
+
+- (CBTerminalContentMetrics)contentMetrics
+{
+    CBTerminalContentMetrics metrics;
+    metrics.contentBounds = CGRectMake(0.0, 0.0, 0.0, 0.0);
+    metrics.bottomContentBounds = CGRectMake(0.0, 0.0, 0.0, 0.0);
+
     BOOL foundContent = NO;
     NSUInteger minimumColumn = _columns;
     NSUInteger maximumColumn = 0;
     NSUInteger minimumRow = _rows;
     NSUInteger maximumRow = 0;
+    NSUInteger bottomRow = 0;
+    NSUInteger bottomMinimumColumn = _columns;
+    NSUInteger bottomMaximumColumn = 0;
 
     for (NSUInteger row = 0; row < _rows; row++) {
         for (NSUInteger column = 0; column < _columns; column++) {
@@ -431,52 +455,36 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
                 continue;
             }
 
+            BOOL isFirstContent = !foundContent;
             foundContent = YES;
             minimumColumn = MIN(minimumColumn, column);
             maximumColumn = MAX(maximumColumn, column);
             minimumRow = MIN(minimumRow, row);
             maximumRow = MAX(maximumRow, row);
-        }
-    }
 
-    if (!foundContent) {
-        return CGRectMake(0.0, 0.0, 0.0, 0.0);
-    }
-
-    return CGRectMake((CGFloat)minimumColumn,
-                      (CGFloat)minimumRow,
-                      (CGFloat)(maximumColumn - minimumColumn + 1),
-                      (CGFloat)(maximumRow - minimumRow + 1));
-}
-
-- (CGRect)bottomContentBounds
-{
-    for (NSUInteger row = _rows; row > 0; row--) {
-        NSUInteger contentRow = row - 1;
-        BOOL foundContent = NO;
-        NSUInteger minimumColumn = _columns;
-        NSUInteger maximumColumn = 0;
-
-        for (NSUInteger column = 0; column < _columns; column++) {
-            CBTerminalCell cell = _cells[contentRow * _columns + column];
-            if (cell.character == ' ') {
-                continue;
+            if (isFirstContent || row > bottomRow) {
+                bottomRow = row;
+                bottomMinimumColumn = column;
+                bottomMaximumColumn = column;
+            } else if (row == bottomRow) {
+                bottomMinimumColumn = MIN(bottomMinimumColumn, column);
+                bottomMaximumColumn = MAX(bottomMaximumColumn, column);
             }
-
-            foundContent = YES;
-            minimumColumn = MIN(minimumColumn, column);
-            maximumColumn = MAX(maximumColumn, column);
-        }
-
-        if (foundContent) {
-            return CGRectMake((CGFloat)minimumColumn,
-                              (CGFloat)contentRow,
-                              (CGFloat)(maximumColumn - minimumColumn + 1),
-                              1.0);
         }
     }
 
-    return CGRectMake(0.0, 0.0, 0.0, 0.0);
+    if (foundContent) {
+        metrics.contentBounds = CGRectMake((CGFloat)minimumColumn,
+                                           (CGFloat)minimumRow,
+                                           (CGFloat)(maximumColumn - minimumColumn + 1),
+                                           (CGFloat)(maximumRow - minimumRow + 1));
+        metrics.bottomContentBounds = CGRectMake((CGFloat)bottomMinimumColumn,
+                                                 (CGFloat)bottomRow,
+                                                 (CGFloat)(bottomMaximumColumn - bottomMinimumColumn + 1),
+                                                 1.0);
+    }
+
+    return metrics;
 }
 
 - (void)showStatusMessage:(NSString *)message
@@ -841,6 +849,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 @property (nonatomic, strong) CBTerminalBuffer *terminalBuffer;
 @property (nonatomic, strong) NSFont *terminalFont;
+@property (nonatomic, strong) NSMutableDictionary<NSNumber *, NSDictionary<NSAttributedStringKey, id> *> *terminalTextAttributesCache;
+@property (nonatomic, strong) NSMutableData *pendingTerminalData;
 @property (nonatomic, strong) dispatch_queue_t readQueue;
 @property (nonatomic, strong) dispatch_source_t readSource;
 @property (nonatomic) CGFloat cellWidth;
@@ -848,6 +858,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic) int masterFileDescriptor;
 @property (nonatomic) pid_t childProcessIdentifier;
 @property (nonatomic) BOOL stoppingChildProcess;
+@property (nonatomic) BOOL terminalDataFlushScheduled;
 @property (nonatomic, strong) NSWindow *configurationSheet;
 @property (nonatomic, strong) NSTextField *timeField;
 @property (nonatomic, strong) NSStepper *timeStepper;
@@ -878,8 +889,9 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     if (self) {
         _masterFileDescriptor = -1;
         _childProcessIdentifier = -1;
+        _pendingTerminalData = [NSMutableData data];
         _readQueue = dispatch_queue_create("wang.leonard.cbonsai-saver.pty", DISPATCH_QUEUE_SERIAL);
-        [self setAnimationTimeInterval:1.0 / 30.0];
+        [self setAnimationTimeInterval:CBIdleAnimationTimeInterval];
         [self registerDefaultSettings];
         [self updateTerminalGeometry];
     }
@@ -920,16 +932,16 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [[NSColor blackColor] setFill];
     NSRectFill(rect);
 
-    [self updateTerminalGeometry];
     if (self.terminalBuffer == nil || self.cellWidth <= 0.0 || self.cellHeight <= 0.0) {
         return;
     }
 
+    CBTerminalContentMetrics metrics = [self.terminalBuffer contentMetrics];
     CGPoint origin = CBTerminalContentOriginForBounds(self.bounds.size,
                                                       CGSizeMake((CGFloat)self.terminalBuffer.columns, (CGFloat)self.terminalBuffer.rows),
                                                       CGSizeMake(self.cellWidth, self.cellHeight),
-                                                      self.terminalBuffer.contentBounds,
-                                                      self.terminalBuffer.bottomContentBounds);
+                                                      metrics.contentBounds,
+                                                      metrics.bottomContentBounds);
 
     for (NSUInteger row = 0; row < self.terminalBuffer.rows; row++) {
         [self drawBackgroundsForRow:row originX:origin.x originY:origin.y];
@@ -1017,6 +1029,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     CGFloat fontSize = [self automaticFontSize];
     if (self.terminalFont == nil || fabs(self.terminalFont.pointSize - fontSize) > 0.1) {
         self.terminalFont = [self terminalFontWithSize:fontSize];
+        self.terminalTextAttributesCache = nil;
         CGSize cellSize = [self cellSizeForFont:self.terminalFont];
         self.cellWidth = ceil(cellSize.width);
         self.cellHeight = ceil(cellSize.height);
@@ -1161,27 +1174,37 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         }
 
         char buffer[4096];
+        NSMutableData *availableData = nil;
+        BOOL shouldHandleExit = NO;
         while (YES) {
             ssize_t byteCount = read(fileDescriptor, buffer, sizeof(buffer));
             if (byteCount > 0) {
-                NSData *data = [NSData dataWithBytes:buffer length:(NSUInteger)byteCount];
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [strongSelf.terminalBuffer appendData:data];
-                    [strongSelf setNeedsDisplay:YES];
-                });
+                if (availableData == nil) {
+                    availableData = [NSMutableData dataWithCapacity:(NSUInteger)byteCount];
+                }
+                [availableData appendBytes:buffer length:(NSUInteger)byteCount];
             } else if (byteCount == 0) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [strongSelf handleChildProcessExit];
-                });
+                shouldHandleExit = YES;
                 break;
             } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 break;
             } else {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [strongSelf handleChildProcessExit];
-                });
+                shouldHandleExit = YES;
                 break;
             }
+        }
+
+        if (availableData.length > 0) {
+            NSData *data = availableData;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [strongSelf enqueueTerminalData:data];
+            });
+        }
+
+        if (shouldHandleExit) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [strongSelf handleChildProcessExit];
+            });
         }
     });
 
@@ -1192,8 +1215,44 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     dispatch_resume(source);
 }
 
+- (void)enqueueTerminalData:(NSData *)data
+{
+    if (data.length == 0) {
+        return;
+    }
+
+    if (self.pendingTerminalData == nil) {
+        self.pendingTerminalData = [NSMutableData data];
+    }
+    [self.pendingTerminalData appendData:data];
+
+    if (self.terminalDataFlushScheduled) {
+        return;
+    }
+
+    self.terminalDataFlushScheduled = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(CBTerminalDataFlushInterval * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self flushPendingTerminalDataAndDisplay];
+    });
+}
+
+- (void)flushPendingTerminalDataAndDisplay
+{
+    self.terminalDataFlushScheduled = NO;
+    if (self.pendingTerminalData.length == 0 || self.terminalBuffer == nil) {
+        return;
+    }
+
+    NSMutableData *data = self.pendingTerminalData;
+    self.pendingTerminalData = [NSMutableData dataWithCapacity:data.length];
+    [self.terminalBuffer appendData:data];
+    [self setNeedsDisplay:YES];
+}
+
 - (void)handleChildProcessExit
 {
+    [self flushPendingTerminalDataAndDisplay];
+
     if (self.readSource != nil) {
         dispatch_source_cancel(self.readSource);
         self.readSource = nil;
@@ -1216,6 +1275,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)stopCbonsaiProcess
 {
     self.stoppingChildProcess = YES;
+    self.terminalDataFlushScheduled = NO;
+    [self.pendingTerminalData setLength:0];
 
     pid_t childPid = self.childProcessIdentifier;
     self.childProcessIdentifier = -1;
@@ -1242,14 +1303,19 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)drawBackgroundsForRow:(NSUInteger)row originX:(CGFloat)originX originY:(CGFloat)originY
 {
+    const CBTerminalCell *cells = [self.terminalBuffer cellsForRow:row];
+    if (cells == NULL) {
+        return;
+    }
+
     NSUInteger column = 0;
     while (column < self.terminalBuffer.columns) {
-        CBTerminalCell cell = [self.terminalBuffer cellAtColumn:column row:row];
+        CBTerminalCell cell = cells[column];
         NSInteger backgroundColor = cell.backgroundColor;
         NSUInteger startColumn = column;
         column++;
         while (column < self.terminalBuffer.columns) {
-            CBTerminalCell nextCell = [self.terminalBuffer cellAtColumn:column row:row];
+            CBTerminalCell nextCell = cells[column];
             if (nextCell.backgroundColor != backgroundColor) {
                 break;
             }
@@ -1268,9 +1334,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)drawTextForRow:(NSUInteger)row originX:(CGFloat)originX originY:(CGFloat)originY
 {
+    const CBTerminalCell *cells = [self.terminalBuffer cellsForRow:row];
+    if (cells == NULL) {
+        return;
+    }
+
     NSUInteger column = 0;
     while (column < self.terminalBuffer.columns) {
-        CBTerminalCell cell = [self.terminalBuffer cellAtColumn:column row:row];
+        CBTerminalCell cell = cells[column];
         if (cell.character == ' ') {
             column++;
             continue;
@@ -1279,26 +1350,54 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         NSInteger foregroundColor = cell.foregroundColor;
         BOOL bold = cell.bold;
         NSUInteger startColumn = column;
-        NSMutableString *text = [NSMutableString string];
+        unichar characters[CBMaximumTerminalColumns];
+        NSUInteger length = 0;
+        NSUInteger drawableLength = 0;
 
         while (column < self.terminalBuffer.columns) {
-            CBTerminalCell nextCell = [self.terminalBuffer cellAtColumn:column row:row];
+            CBTerminalCell nextCell = cells[column];
             if (nextCell.foregroundColor != foregroundColor || nextCell.bold != bold) {
                 break;
             }
-            [text appendFormat:@"%C", nextCell.character];
+            characters[length] = nextCell.character;
+            length++;
+            if (nextCell.character != ' ') {
+                drawableLength = length;
+            }
             column++;
         }
 
-        NSInteger effectiveColor = (bold && foregroundColor >= 0 && foregroundColor <= 7) ? foregroundColor + 8 : foregroundColor;
-        NSDictionary<NSAttributedStringKey, id> *attributes = @{
-            NSFontAttributeName: self.terminalFont,
-            NSForegroundColorAttributeName: CBColorForANSIIndex(effectiveColor),
-        };
+        if (drawableLength == 0) {
+            continue;
+        }
+
+        NSString *text = [[NSString alloc] initWithCharacters:characters length:drawableLength];
+        NSDictionary<NSAttributedStringKey, id> *attributes = [self textAttributesForForegroundColor:foregroundColor bold:bold];
         [text drawAtPoint:NSMakePoint(originX + (CGFloat)startColumn * self.cellWidth,
                                       originY + (CGFloat)row * self.cellHeight)
            withAttributes:attributes];
     }
+}
+
+- (NSDictionary<NSAttributedStringKey, id> *)textAttributesForForegroundColor:(NSInteger)foregroundColor bold:(BOOL)bold
+{
+    NSInteger effectiveColor = (bold && foregroundColor >= 0 && foregroundColor <= 7) ? foregroundColor + 8 : foregroundColor;
+    NSNumber *cacheKey = @(effectiveColor);
+    NSDictionary<NSAttributedStringKey, id> *attributes = self.terminalTextAttributesCache[cacheKey];
+    if (attributes != nil) {
+        return attributes;
+    }
+
+    if (self.terminalTextAttributesCache == nil) {
+        self.terminalTextAttributesCache = [NSMutableDictionary dictionary];
+    }
+
+    attributes = @{
+        NSFontAttributeName: self.terminalFont,
+        NSForegroundColorAttributeName: CBColorForANSIIndex(effectiveColor),
+    };
+    self.terminalTextAttributesCache[cacheKey] = attributes;
+    return attributes;
 }
 
 - (void)buildConfigurationContent
