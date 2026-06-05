@@ -50,10 +50,6 @@ int main(void)
             CBCbonsaiLifeKey: @144,
             CBCbonsaiSeedEnabledKey: @YES,
             CBCbonsaiSeedKey: @12345,
-            CBCbonsaiSaveEnabledKey: @YES,
-            CBCbonsaiSavePathKey: @" /tmp/cbonsai-save ",
-            CBCbonsaiLoadEnabledKey: @YES,
-            CBCbonsaiLoadPathKey: @" /tmp/cbonsai-load ",
             CBCbonsaiVerboseKey: @YES,
         }, (@[
             @"--live",
@@ -67,8 +63,6 @@ int main(void)
             @"--multiplier=13",
             @"--life=144",
             @"--seed=12345",
-            @"--save=/tmp/cbonsai-save",
-            @"--load=/tmp/cbonsai-load",
             @"--verbose",
         ]));
 

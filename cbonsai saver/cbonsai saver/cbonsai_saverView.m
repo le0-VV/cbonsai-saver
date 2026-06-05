@@ -833,10 +833,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic, strong) NSStepper *lifeStepper;
 @property (nonatomic, strong) NSButton *seedEnabledButton;
 @property (nonatomic, strong) NSTextField *seedField;
-@property (nonatomic, strong) NSButton *saveEnabledButton;
-@property (nonatomic, strong) NSTextField *savePathField;
-@property (nonatomic, strong) NSButton *loadEnabledButton;
-@property (nonatomic, strong) NSTextField *loadPathField;
 @property (nonatomic, strong) NSButton *verboseButton;
 
 @end
@@ -1291,14 +1287,30 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 {
     NSView *contentView = self.configurationSheet.contentView;
 
-    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(20, 66, CBConfigurationSheetWidth - 40, CBConfigurationSheetHeight - 88)];
+    NSTabView *tabView = [[NSTabView alloc] initWithFrame:NSMakeRect(20, 66, CBConfigurationSheetWidth - 40, CBConfigurationSheetHeight - 88)];
+    [contentView addSubview:tabView];
+
+    NSTabViewItem *settingsTab = [[NSTabViewItem alloc] initWithIdentifier:@"settings"];
+    settingsTab.label = @"Settings";
+    NSView *settingsView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(tabView.frame), NSHeight(tabView.frame))];
+    settingsTab.view = settingsView;
+    [tabView addTabViewItem:settingsTab];
+
+    NSTabViewItem *advancedTab = [[NSTabViewItem alloc] initWithIdentifier:@"advanced"];
+    advancedTab.label = @"Advanced";
+    CBFlippedView *advancedView = [[CBFlippedView alloc] initWithFrame:NSMakeRect(0, 0, NSWidth(tabView.frame), NSHeight(tabView.frame))];
+    advancedTab.view = advancedView;
+    [tabView addTabViewItem:advancedTab];
+
+    NSScrollView *scrollView = [[NSScrollView alloc] initWithFrame:settingsView.bounds];
     scrollView.hasVerticalScroller = YES;
     scrollView.autohidesScrollers = YES;
     scrollView.borderType = NSNoBorder;
-    [contentView addSubview:scrollView];
+    scrollView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [settingsView addSubview:scrollView];
 
     CGFloat documentWidth = NSWidth(scrollView.frame) - 18.0;
-    CBFlippedView *documentView = [[CBFlippedView alloc] initWithFrame:NSMakeRect(0, 0, documentWidth, 840)];
+    CBFlippedView *documentView = [[CBFlippedView alloc] initWithFrame:NSMakeRect(0, 0, documentWidth, 500)];
     scrollView.documentView = documentView;
 
     CGFloat y = 18.0;
@@ -1384,28 +1396,18 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:200.0 increment:1.0];
     [self setToolTip:@"How long branches keep growing." forViews:@[lifeLabel, self.lifeField, self.lifeStepper]];
     [self addHelpButtonForAnchor:@"life" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 48.0;
+    y += 34.0;
 
-    y = [self addSectionTitle:@"Output" toView:documentView y:y];
-    self.seedEnabledButton = [self addCheckbox:@"Seed" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
-    self.seedField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 120, 24)];
+    CGFloat advancedY = 24.0;
+    self.seedEnabledButton = [self addCheckbox:@"Seed" toView:advancedView frame:NSMakeRect(labelX, advancedY - 2, 160, 24)];
+    self.seedField = [self addTextFieldToView:advancedView frame:NSMakeRect(fieldX, advancedY - 2, 120, 24)];
     [self setToolTip:@"Fixed random seed." forViews:@[self.seedEnabledButton, self.seedField]];
-    [self addHelpButtonForAnchor:@"seed" toView:documentView frame:NSMakeRect(fieldX + 128.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    self.verboseButton = [self addCheckbox:@"Verbose" toView:documentView frame:NSMakeRect(labelX + 470, y - 2, 130, 24)];
+    [self addHelpButtonForAnchor:@"seed" toView:advancedView frame:NSMakeRect(fieldX + 128.0, advancedY, CBHelpButtonSize, CBHelpButtonSize)];
+    advancedY += 34.0;
+
+    self.verboseButton = [self addCheckbox:@"Verbose" toView:advancedView frame:NSMakeRect(labelX, advancedY - 2, 180, 24)];
     [self setToolTip:@"Print extra output." forViews:@[self.verboseButton]];
-    [self addHelpButtonForAnchor:@"verbose" toView:documentView frame:NSMakeRect(labelX + 604.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 34.0;
-
-    self.saveEnabledButton = [self addCheckbox:@"Save file" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
-    self.savePathField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self setToolTip:@"Save tree state file." forViews:@[self.saveEnabledButton, self.savePathField]];
-    [self addHelpButtonForAnchor:@"save" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 34.0;
-
-    self.loadEnabledButton = [self addCheckbox:@"Load file" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
-    self.loadPathField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self setToolTip:@"Load tree state file." forViews:@[self.loadEnabledButton, self.loadPathField]];
-    [self addHelpButtonForAnchor:@"load" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self addHelpButtonForAnchor:@"verbose" toView:advancedView frame:NSMakeRect(labelX + 184.0, advancedY, CBHelpButtonSize, CBHelpButtonSize)];
 
     NSButton *cancelButton = [[NSButton alloc] initWithFrame:NSMakeRect(CBConfigurationSheetWidth - 220, 18, 90, 30)];
     cancelButton.title = @"Cancel";
@@ -1557,10 +1559,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self setIntegerField:self.lifeField stepper:self.lifeStepper value:[self integerOption:options key:CBCbonsaiLifeKey]];
     self.seedEnabledButton.state = [self boolOption:options key:CBCbonsaiSeedEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
     self.seedField.stringValue = [NSString stringWithFormat:@"%ld", (long)[self integerOption:options key:CBCbonsaiSeedKey]];
-    self.saveEnabledButton.state = [self boolOption:options key:CBCbonsaiSaveEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
-    self.savePathField.stringValue = [self stringOption:options key:CBCbonsaiSavePathKey];
-    self.loadEnabledButton.state = [self boolOption:options key:CBCbonsaiLoadEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
-    self.loadPathField.stringValue = [self stringOption:options key:CBCbonsaiLoadPathKey];
     self.verboseButton.state = [self boolOption:options key:CBCbonsaiVerboseKey] ? NSControlStateValueOn : NSControlStateValueOff;
     [self updateOptionalFieldStates];
 }
@@ -1584,10 +1582,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [defaults setInteger:life forKey:CBCbonsaiLifeKey];
     [defaults setBool:self.seedEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiSeedEnabledKey];
     [defaults setInteger:self.seedField.integerValue forKey:CBCbonsaiSeedKey];
-    [defaults setBool:self.saveEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiSaveEnabledKey];
-    [defaults setObject:[self trimmedStringFromField:self.savePathField] forKey:CBCbonsaiSavePathKey];
-    [defaults setBool:self.loadEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiLoadEnabledKey];
-    [defaults setObject:[self trimmedStringFromField:self.loadPathField] forKey:CBCbonsaiLoadPathKey];
     [defaults setBool:self.verboseButton.state == NSControlStateValueOn forKey:CBCbonsaiVerboseKey];
     [defaults synchronize];
 
@@ -1640,8 +1634,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)updateOptionalFieldStates
 {
     self.seedField.enabled = self.seedEnabledButton.state == NSControlStateValueOn;
-    self.savePathField.enabled = self.saveEnabledButton.state == NSControlStateValueOn;
-    self.loadPathField.enabled = self.loadEnabledButton.state == NSControlStateValueOn;
 }
 
 - (BOOL)boolOption:(NSDictionary<NSString *, id> *)options key:(NSString *)key

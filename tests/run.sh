@@ -62,6 +62,11 @@ if grep -Fq 'CBCbonsaiPrintKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$
   exit 1
 fi
 
+if grep -Fq 'CBCbonsaiSave' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH" || grep -Fq 'CBCbonsaiLoad' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
+  echo "Save and load files should not be supported as screen saver settings." >&2
+  exit 1
+fi
+
 if grep -Fq 'CBCbonsaiLiveKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH" || grep -Fq 'CBCbonsaiInfiniteKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
   echo "Live and infinite modes should always be enabled, not exposed as settings." >&2
   exit 1
@@ -74,6 +79,16 @@ fi
 
 if grep -Fq 'Print when finished' "$VIEW_PATH" || grep -Fq 'Show help' "$VIEW_PATH"; then
   echo "Print and help controls should not be present in the configuration sheet." >&2
+  exit 1
+fi
+
+if grep -Fq 'Save file' "$VIEW_PATH" || grep -Fq 'Load file' "$VIEW_PATH"; then
+  echo "Save and load file controls should not be present in the configuration sheet." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'NSTabView' "$VIEW_PATH" || ! grep -Fq 'advancedTab.label = @"Advanced"' "$VIEW_PATH"; then
+  echo "Seed and verbose settings should live in an Advanced sub-pane." >&2
   exit 1
 fi
 
@@ -125,6 +140,11 @@ if grep -Fq 'id="print"' "$MANUAL_PATH" || grep -Fq 'id="help"' "$MANUAL_PATH"; 
   exit 1
 fi
 
+if grep -Fq 'id="save"' "$MANUAL_PATH" || grep -Fq 'id="load"' "$MANUAL_PATH"; then
+  echo "Save and load should not have setting manual anchors." >&2
+  exit 1
+fi
+
 if ! grep -Fq "Bundle cbonsai" "$PROJECT_PATH" || ! grep -Fq "bundle-cbonsai.sh" "$PROJECT_PATH"; then
   echo "Xcode target should bundle cbonsai during build." >&2
   exit 1
@@ -140,8 +160,6 @@ for anchor in \
   multiplier \
   life \
   seed \
-  save \
-  load \
   verbose
 do
   if ! grep -q "id=\"$anchor\"" "$MANUAL_PATH"; then
@@ -195,8 +213,6 @@ Choose fixed ANSI colours.
 Branch density.
 How long branches keep growing.
 Fixed random seed.
-Save tree state file.
-Load tree state file.
 Print extra output.
 Open manual.
 EOF
