@@ -37,6 +37,11 @@ if grep -Fq 'CBDefaultExecutablePath' "cbonsai saver/cbonsai saver/CBCommandLine
   exit 1
 fi
 
+if grep -Fq 'CBCbonsaiScreensaverKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
+  echo "Screensaver mode should not be exposed." >&2
+  exit 1
+fi
+
 if ! grep -Fq "Bundle cbonsai" "$PROJECT_PATH" || ! grep -Fq "bundle-cbonsai.sh" "$PROJECT_PATH"; then
   echo "Xcode target should bundle cbonsai during build." >&2
   exit 1
@@ -44,7 +49,6 @@ fi
 
 for anchor in \
   font-size \
-  screensaver \
   live \
   infinite \
   time \
@@ -80,7 +84,6 @@ do
   fi
 done <<'EOF'
 Terminal font size.
-Continuously redraw trees.
 Animate growth.
 Keep cbonsai running.
 Growth delay in seconds.

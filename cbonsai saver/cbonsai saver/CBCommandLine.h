@@ -7,7 +7,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-extern NSString * const CBCbonsaiScreensaverKey;
 extern NSString * const CBCbonsaiLiveKey;
 extern NSString * const CBCbonsaiInfiniteKey;
 extern NSString * const CBCbonsaiTimeKey;

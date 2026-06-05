@@ -27,9 +27,10 @@ int main(void)
         CBAssert([CBDefaultEnvironmentPath() containsString:@"/opt/homebrew/bin"], @"Default PATH should include Homebrew on Apple Silicon.");
 
         CBAssertArguments(@{}, (@[
-            @"--screensaver",
+            @"--live",
+            @"--infinite",
             @"--time=0.03",
-            @"--wait=4",
+            @"--wait=3",
             @"--leaf=&",
             @"--color=2,3,10,11",
             @"--multiplier=5",
@@ -37,7 +38,6 @@ int main(void)
         ]));
 
         CBAssertArguments(@{
-            CBCbonsaiScreensaverKey: @NO,
             CBCbonsaiLiveKey: @YES,
             CBCbonsaiInfiniteKey: @YES,
             CBCbonsaiTimeKey: @0.12,
@@ -75,6 +75,18 @@ int main(void)
             @"--load=/tmp/cbonsai-load",
             @"--verbose",
             @"--help",
+        ]));
+
+        CBAssertArguments(@{
+            CBCbonsaiLiveKey: @NO,
+            CBCbonsaiInfiniteKey: @NO,
+        }, (@[
+            @"--time=0.03",
+            @"--wait=3",
+            @"--leaf=&",
+            @"--color=2,3,10,11",
+            @"--multiplier=5",
+            @"--life=32",
         ]));
     }
 

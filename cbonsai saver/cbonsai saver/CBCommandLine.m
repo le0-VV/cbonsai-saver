@@ -5,7 +5,6 @@
 
 #import "CBCommandLine.h"
 
-NSString * const CBCbonsaiScreensaverKey = @"cbonsaiScreensaver";
 NSString * const CBCbonsaiLiveKey = @"cbonsaiLive";
 NSString * const CBCbonsaiInfiniteKey = @"cbonsaiInfinite";
 NSString * const CBCbonsaiTimeKey = @"cbonsaiTime";
@@ -67,11 +66,10 @@ NSString *CBDefaultEnvironmentPath(void)
 NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void)
 {
     return @{
-        CBCbonsaiScreensaverKey: @YES,
-        CBCbonsaiLiveKey: @NO,
-        CBCbonsaiInfiniteKey: @NO,
+        CBCbonsaiLiveKey: @YES,
+        CBCbonsaiInfiniteKey: @YES,
         CBCbonsaiTimeKey: @0.03,
-        CBCbonsaiWaitKey: @4.0,
+        CBCbonsaiWaitKey: @3.0,
         CBCbonsaiMessageKey: @"",
         CBCbonsaiBaseEnabledKey: @NO,
         CBCbonsaiBaseKey: @1,
@@ -97,9 +95,6 @@ NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> 
     [mergedOptions addEntriesFromDictionary:options ?: @{}];
 
     NSMutableArray<NSString *> *arguments = [NSMutableArray array];
-    if (CBBoolOption(mergedOptions, CBCbonsaiScreensaverKey)) {
-        [arguments addObject:@"--screensaver"];
-    }
     if (CBBoolOption(mergedOptions, CBCbonsaiLiveKey)) {
         [arguments addObject:@"--live"];
     }

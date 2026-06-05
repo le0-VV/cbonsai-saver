@@ -21,6 +21,8 @@
 
 static NSString * const CBSettingsModuleName = @"wang.leonard.cbonsai-saver";
 static NSString * const CBFontSizeKey = @"fontSize";
+static NSString * const CBLegacyScreensaverKey = @"cbonsaiScreensaver";
+static NSString * const CBModeDefaultsMigrationKey = @"modeDefaultsMigrated";
 static const CGFloat CBDefaultFontSize = 14.0;
 static const NSInteger CBDefaultForegroundColor = 7;
 static const NSInteger CBDefaultBackgroundColor = -1;
@@ -658,7 +660,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic, strong) NSWindow *configurationSheet;
 @property (nonatomic, strong) NSTextField *fontSizeField;
 @property (nonatomic, strong) NSStepper *fontSizeStepper;
-@property (nonatomic, strong) NSButton *screensaverButton;
 @property (nonatomic, strong) NSButton *liveButton;
 @property (nonatomic, strong) NSButton *infiniteButton;
 @property (nonatomic, strong) NSTextField *timeField;
@@ -784,12 +785,32 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     } mutableCopy];
     [registeredDefaults addEntriesFromDictionary:CBDefaultCbonsaiOptions()];
     [defaults registerDefaults:registeredDefaults];
+    [self migrateModeDefaultsIfNeeded:defaults];
     return defaults;
 }
 
 - (void)registerDefaultSettings
 {
     (void)[self screenSaverDefaults];
+}
+
+- (void)migrateModeDefaultsIfNeeded:(ScreenSaverDefaults *)defaults
+{
+    if ([defaults boolForKey:CBModeDefaultsMigrationKey]) {
+        return;
+    }
+
+    id legacyScreensaverValue = [defaults objectForKey:CBLegacyScreensaverKey];
+    if ([legacyScreensaverValue respondsToSelector:@selector(boolValue)] && [legacyScreensaverValue boolValue]) {
+        [defaults setBool:YES forKey:CBCbonsaiLiveKey];
+        [defaults setBool:YES forKey:CBCbonsaiInfiniteKey];
+        if (fabs([defaults doubleForKey:CBCbonsaiWaitKey] - 4.0) < 0.0001) {
+            [defaults setDouble:3.0 forKey:CBCbonsaiWaitKey];
+        }
+    }
+
+    [defaults setBool:YES forKey:CBModeDefaultsMigrationKey];
+    [defaults synchronize];
 }
 
 - (NSDictionary<NSString *, id> *)configuredCbonsaiOptions
@@ -1015,7 +1036,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
 
     if (!self.stoppingChildProcess) {
-        [self.terminalBuffer showStatusMessage:@"cbonsai exited. Use --screensaver or -li for continuous output."];
+        [self.terminalBuffer showStatusMessage:@"cbonsai exited. Enable --live and --infinite for continuous output."];
         [self setNeedsDisplay:YES];
     }
 }
@@ -1138,15 +1159,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     y += 48.0;
 
     y = [self addSectionTitle:@"Mode" toView:documentView y:y];
-    self.screensaverButton = [self addCheckbox:@"Screensaver (--screensaver)" toView:documentView frame:NSMakeRect(labelX, y - 2, 210, 24)];
-    [self setToolTip:@"Continuously redraw trees." forViews:@[self.screensaverButton]];
-    [self addHelpButtonForAnchor:@"screensaver" toView:documentView frame:NSMakeRect(labelX + 214.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    self.liveButton = [self addCheckbox:@"Live (--live)" toView:documentView frame:NSMakeRect(labelX + 260, y - 2, 116, 24)];
+    self.liveButton = [self addCheckbox:@"Live (--live)" toView:documentView frame:NSMakeRect(labelX, y - 2, 116, 24)];
     [self setToolTip:@"Animate growth." forViews:@[self.liveButton]];
-    [self addHelpButtonForAnchor:@"live" toView:documentView frame:NSMakeRect(labelX + 380.0, y, CBHelpButtonSize, CBHelpButtonSize)];
-    self.infiniteButton = [self addCheckbox:@"Infinite (--infinite)" toView:documentView frame:NSMakeRect(labelX + 420, y - 2, 152, 24)];
+    [self addHelpButtonForAnchor:@"live" toView:documentView frame:NSMakeRect(labelX + 120.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    self.infiniteButton = [self addCheckbox:@"Infinite (--infinite)" toView:documentView frame:NSMakeRect(labelX + 180, y - 2, 152, 24)];
     [self setToolTip:@"Keep cbonsai running." forViews:@[self.infiniteButton]];
-    [self addHelpButtonForAnchor:@"infinite" toView:documentView frame:NSMakeRect(labelX + 576.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self addHelpButtonForAnchor:@"infinite" toView:documentView frame:NSMakeRect(labelX + 336.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 42.0;
 
     y = [self addSectionTitle:@"Timing" toView:documentView y:y];
@@ -1316,7 +1334,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
     self.fontSizeStepper.doubleValue = self.configuredFontSize;
 
-    self.screensaverButton.state = [self boolOption:options key:CBCbonsaiScreensaverKey] ? NSControlStateValueOn : NSControlStateValueOff;
     self.liveButton.state = [self boolOption:options key:CBCbonsaiLiveKey] ? NSControlStateValueOn : NSControlStateValueOff;
     self.infiniteButton.state = [self boolOption:options key:CBCbonsaiInfiniteKey] ? NSControlStateValueOn : NSControlStateValueOff;
     [self setDoubleField:self.timeField stepper:self.timeStepper value:[self doubleOption:options key:CBCbonsaiTimeKey]];
@@ -1351,7 +1368,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     ScreenSaverDefaults *defaults = [self screenSaverDefaults];
     [defaults setDouble:fontSize forKey:CBFontSizeKey];
-    [defaults setBool:self.screensaverButton.state == NSControlStateValueOn forKey:CBCbonsaiScreensaverKey];
     [defaults setBool:self.liveButton.state == NSControlStateValueOn forKey:CBCbonsaiLiveKey];
     [defaults setBool:self.infiniteButton.state == NSControlStateValueOn forKey:CBCbonsaiInfiniteKey];
     [defaults setDouble:time forKey:CBCbonsaiTimeKey];
