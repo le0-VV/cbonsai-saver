@@ -12,6 +12,7 @@
 #import <dispatch/dispatch.h>
 #import <errno.h>
 #import <fcntl.h>
+#import <limits.h>
 #import <signal.h>
 #import <stdlib.h>
 #import <string.h>
@@ -25,6 +26,12 @@ static NSString * const CBLegacyScreensaverKey = @"cbonsaiScreensaver";
 static NSString * const CBModeDefaultsMigrationKey = @"modeDefaultsMigrated";
 static const NSInteger CBDefaultForegroundColor = 7;
 static const NSInteger CBDefaultBackgroundColor = -1;
+static const NSUInteger CBMinimumTerminalColumns = 40;
+static const NSUInteger CBMinimumTerminalRows = 12;
+static const NSUInteger CBMaximumTerminalColumns = 220;
+static const NSUInteger CBMaximumTerminalRows = 80;
+static const NSUInteger CBMaximumCSIParameterLength = 64;
+static const NSUInteger CBMaximumCSIParameterCount = 16;
 static const CGFloat CBConfigurationSheetWidth = 720.0;
 static const CGFloat CBConfigurationSheetHeight = 620.0;
 static NSString * const CBManualResourceName = @"cbonsai-manual";
@@ -202,6 +209,14 @@ static NSUInteger CBParameterAt(NSArray<NSNumber *> *parameters, NSUInteger inde
     return parameters[index].unsignedIntegerValue;
 }
 
+static unsigned short CBClampedUnsignedShortFromCGFloat(CGFloat value)
+{
+    if (value <= 0.0) {
+        return 0;
+    }
+    return (unsigned short)MIN(value, (CGFloat)USHRT_MAX);
+}
+
 static char **CBCStringArrayFromStrings(NSArray<NSString *> *strings)
 {
     char **result = calloc(strings.count + 1, sizeof(char *));
@@ -254,10 +269,20 @@ static NSArray<NSNumber *> *CBParametersFromCSIString(NSString *string, BOOL *is
 
     NSMutableArray<NSNumber *> *result = [NSMutableArray array];
     for (NSString *component in [parameters componentsSeparatedByString:@";"]) {
+        if (result.count >= CBMaximumCSIParameterCount) {
+            break;
+        }
+
         if (component.length == 0) {
             [result addObject:@0];
         } else {
-            [result addObject:@(component.integerValue)];
+            NSScanner *scanner = [NSScanner scannerWithString:component];
+            scanner.charactersToBeSkipped = nil;
+            NSInteger value = 0;
+            if (![scanner scanInteger:&value] || !scanner.isAtEnd || value < 0) {
+                value = 0;
+            }
+            [result addObject:@(MIN(value, 10000))];
         }
     }
     return result;
@@ -542,8 +567,16 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         [self handleCSIWithFinalByte:byte];
         [_csiString setString:@""];
         _parserState = CBParserStateGround;
-    } else {
+    } else if ((byte >= '0' && byte <= '9') || byte == ';' || byte == '?') {
+        if (_csiString.length >= CBMaximumCSIParameterLength) {
+            [_csiString setString:@""];
+            _parserState = CBParserStateGround;
+            return;
+        }
         [_csiString appendFormat:@"%c", byte];
+    } else {
+        [_csiString setString:@""];
+        _parserState = CBParserStateGround;
     }
 }
 
@@ -993,8 +1026,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return;
     }
 
-    NSUInteger columns = MAX((NSUInteger)1, (NSUInteger)floor(NSWidth(self.bounds) / self.cellWidth));
-    NSUInteger rows = MAX((NSUInteger)1, (NSUInteger)floor(NSHeight(self.bounds) / self.cellHeight));
+    NSUInteger columns = MIN(CBMaximumTerminalColumns, MAX(CBMinimumTerminalColumns, (NSUInteger)floor(NSWidth(self.bounds) / self.cellWidth)));
+    NSUInteger rows = MIN(CBMaximumTerminalRows, MAX(CBMinimumTerminalRows, (NSUInteger)floor(NSHeight(self.bounds) / self.cellHeight)));
 
     if (self.terminalBuffer == nil) {
         self.terminalBuffer = [[CBTerminalBuffer alloc] initWithColumns:columns rows:rows];
@@ -1028,8 +1061,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     memset(&size, 0, sizeof(size));
     size.ws_col = (unsigned short)self.terminalBuffer.columns;
     size.ws_row = (unsigned short)self.terminalBuffer.rows;
-    size.ws_xpixel = (unsigned short)NSWidth(self.bounds);
-    size.ws_ypixel = (unsigned short)NSHeight(self.bounds);
+    size.ws_xpixel = CBClampedUnsignedShortFromCGFloat(NSWidth(self.bounds));
+    size.ws_ypixel = CBClampedUnsignedShortFromCGFloat(NSHeight(self.bounds));
     ioctl(self.masterFileDescriptor, TIOCSWINSZ, &size);
 }
 
@@ -1040,7 +1073,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
 
     NSString *executablePath = self.bundledCbonsaiPath;
-    if (executablePath.length == 0) {
+    if (executablePath.length == 0 || ![NSFileManager.defaultManager isExecutableFileAtPath:executablePath]) {
         [self.terminalBuffer showStatusMessage:@"Bundled cbonsai binary is missing."];
         [self setNeedsDisplay:YES];
         return;
@@ -1048,11 +1081,11 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     NSArray<NSString *> *arguments = CBCbonsaiArgumentsFromOptions(self.configuredCbonsaiOptions);
 
-    char **shellArgv = [self createShellArgvWithArguments:arguments];
-    char **shellEnvironment = [self createShellEnvironmentWithExecutablePath:executablePath];
-    if (shellArgv == NULL || shellEnvironment == NULL) {
-        CBFreeCStringArray(shellArgv);
-        CBFreeCStringArray(shellEnvironment);
+    char **processArgv = [self createProcessArgvWithExecutablePath:executablePath arguments:arguments];
+    char **processEnvironment = [self createProcessEnvironment];
+    if (processArgv == NULL || processEnvironment == NULL) {
+        CBFreeCStringArray(processArgv);
+        CBFreeCStringArray(processEnvironment);
         [self.terminalBuffer showStatusMessage:@"Unable to allocate cbonsai launch arguments."];
         [self setNeedsDisplay:YES];
         return;
@@ -1063,25 +1096,25 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     memset(&size, 0, sizeof(size));
     size.ws_col = (unsigned short)self.terminalBuffer.columns;
     size.ws_row = (unsigned short)self.terminalBuffer.rows;
-    size.ws_xpixel = (unsigned short)NSWidth(self.bounds);
-    size.ws_ypixel = (unsigned short)NSHeight(self.bounds);
+    size.ws_xpixel = CBClampedUnsignedShortFromCGFloat(NSWidth(self.bounds));
+    size.ws_ypixel = CBClampedUnsignedShortFromCGFloat(NSHeight(self.bounds));
 
     pid_t childPid = forkpty(&masterFileDescriptor, NULL, NULL, &size);
     if (childPid < 0) {
-        CBFreeCStringArray(shellArgv);
-        CBFreeCStringArray(shellEnvironment);
+        CBFreeCStringArray(processArgv);
+        CBFreeCStringArray(processEnvironment);
         [self.terminalBuffer showStatusMessage:[NSString stringWithFormat:@"forkpty failed: %s", strerror(errno)]];
         [self setNeedsDisplay:YES];
         return;
     }
 
     if (childPid == 0) {
-        execve("/bin/sh", shellArgv, shellEnvironment);
+        execve(processArgv[0], processArgv, processEnvironment);
         _exit(127);
     }
 
-    CBFreeCStringArray(shellArgv);
-    CBFreeCStringArray(shellEnvironment);
+    CBFreeCStringArray(processArgv);
+    CBFreeCStringArray(processEnvironment);
 
     fcntl(masterFileDescriptor, F_SETFL, fcntl(masterFileDescriptor, F_GETFL, 0) | O_NONBLOCK);
     self.masterFileDescriptor = masterFileDescriptor;
@@ -1090,16 +1123,11 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self startReadingFromPty:masterFileDescriptor];
 }
 
-- (char **)createShellArgvWithArguments:(NSArray<NSString *> *)arguments
+- (char **)createProcessArgvWithExecutablePath:(NSString *)executablePath arguments:(NSArray<NSString *> *)arguments
 {
-    NSMutableArray<NSString *> *shellArguments = [NSMutableArray arrayWithObjects:
-        @"sh",
-        @"-c",
-        @"exec \"$CBONSAI_EXECUTABLE\" \"$@\"",
-        @"cbonsai-saver",
-        nil];
-    [shellArguments addObjectsFromArray:arguments];
-    return CBCStringArrayFromStrings(shellArguments);
+    NSMutableArray<NSString *> *processArguments = [NSMutableArray arrayWithObject:executablePath];
+    [processArguments addObjectsFromArray:arguments];
+    return CBCStringArrayFromStrings(processArguments);
 }
 
 - (NSString *)bundledCbonsaiPath
@@ -1108,24 +1136,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return url.path ?: @"";
 }
 
-- (char **)createShellEnvironmentWithExecutablePath:(NSString *)executablePath
+- (char **)createProcessEnvironment
 {
-    NSDictionary<NSString *, NSString *> *processEnvironment = NSProcessInfo.processInfo.environment;
     NSMutableArray<NSString *> *environment = [NSMutableArray arrayWithObjects:
-        [@"CBONSAI_EXECUTABLE=" stringByAppendingString:executablePath],
         [@"PATH=" stringByAppendingString:CBDefaultEnvironmentPath()],
         @"TERM=xterm-256color",
+        @"LANG=en_US.UTF-8",
+        @"LC_ALL=en_US.UTF-8",
         nil];
-
-    NSString *language = processEnvironment[@"LANG"];
-    [environment addObject:[@"LANG=" stringByAppendingString:(language.length > 0 ? language : @"en_US.UTF-8")]];
-
-    for (NSString *key in @[@"HOME", @"USER", @"LOGNAME", @"TMPDIR", @"XDG_CACHE_HOME"]) {
-        NSString *value = processEnvironment[key];
-        if (value.length > 0) {
-            [environment addObject:[NSString stringWithFormat:@"%@=%@", key, value]];
-        }
-    }
 
     return CBCStringArrayFromStrings(environment);
 }
@@ -1330,7 +1348,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     NSTextField *waitLabel = [self addLabel:@"Growth restart wait time (seconds)" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
     self.waitField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
-    self.waitStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:600.0 increment:0.25];
+    self.waitStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.01 max:600.0 increment:0.25];
     [self setToolTip:@"Delay before restarting growth." forViews:@[waitLabel, self.waitField, self.waitStepper]];
     [self addHelpButtonForAnchor:@"wait" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
@@ -1386,14 +1404,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     NSTextField *multiplierLabel = [self addLabel:@"Tree density" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
     self.multiplierField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
-    self.multiplierStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:20.0 increment:1.0];
+    self.multiplierStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:1.0 max:20.0 increment:1.0];
     [self setToolTip:@"Branch density." forViews:@[multiplierLabel, self.multiplierField, self.multiplierStepper]];
     [self addHelpButtonForAnchor:@"multiplier" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     NSTextField *lifeLabel = [self addLabel:@"Branch lifetime duration (steps)" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
     self.lifeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
-    self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:200.0 increment:1.0];
+    self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:1.0 max:200.0 increment:1.0];
     [self setToolTip:@"How long branches keep growing." forViews:@[lifeLabel, self.lifeField, self.lifeStepper]];
     [self addHelpButtonForAnchor:@"life" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
@@ -1565,10 +1583,10 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)saveConfiguration:(id)sender
 {
-    double time = MAX(self.timeField.doubleValue, 0.01);
-    double wait = MAX(self.waitField.doubleValue, 0.0);
-    NSInteger multiplier = MIN(MAX(self.multiplierField.integerValue, 0), 20);
-    NSInteger life = MIN(MAX(self.lifeField.integerValue, 0), 200);
+    double time = MIN(MAX(self.timeField.doubleValue, 0.01), 60.0);
+    double wait = MIN(MAX(self.waitField.doubleValue, 0.01), 600.0);
+    NSInteger multiplier = MIN(MAX(self.multiplierField.integerValue, 1), 20);
+    NSInteger life = MIN(MAX(self.lifeField.integerValue, 1), 200);
 
     ScreenSaverDefaults *defaults = [self screenSaverDefaults];
     [defaults setDouble:time forKey:CBCbonsaiTimeKey];

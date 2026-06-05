@@ -24,7 +24,7 @@ static void CBAssertArguments(NSDictionary<NSString *, id> *options, NSArray<NSS
 int main(void)
 {
     @autoreleasepool {
-        CBAssert([CBDefaultEnvironmentPath() containsString:@"/opt/homebrew/bin"], @"Default PATH should include Homebrew on Apple Silicon.");
+        CBAssert([CBDefaultEnvironmentPath() isEqualToString:@"/usr/bin:/bin:/usr/sbin:/sbin"], @"Default PATH should only include system directories.");
 
         CBAssertArguments(@{}, (@[
             @"--live",
@@ -79,6 +79,30 @@ int main(void)
             @"--color=2,3,10,11",
             @"--multiplier=5",
             @"--life=32",
+        ]));
+
+        CBAssertArguments(@{
+            CBCbonsaiTimeKey: @(-5.0),
+            CBCbonsaiWaitKey: @0,
+            CBCbonsaiMessageKey: @" hi \033[31m\nthere ",
+            CBCbonsaiBaseKey: @99,
+            CBCbonsaiLeafKey: @"a,\n,b,\033,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q",
+            CBCbonsaiColorKey: @"1,2,invalid,4",
+            CBCbonsaiMultiplierKey: @0,
+            CBCbonsaiLifeKey: @0,
+            CBCbonsaiSeedEnabledKey: @YES,
+            CBCbonsaiSeedKey: @0,
+        }, (@[
+            @"--live",
+            @"--infinite",
+            @"--time=0.01",
+            @"--wait=0.01",
+            @"--message=hi [31mthere",
+            @"--base=2",
+            @"--leaf=a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p",
+            @"--color=2,3,10,11",
+            @"--multiplier=1",
+            @"--life=1",
         ]));
     }
 

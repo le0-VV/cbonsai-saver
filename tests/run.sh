@@ -28,9 +28,12 @@ clang \
 
 MANUAL_PATH="cbonsai saver/cbonsai saver/cbonsai-manual.html"
 VIEW_PATH="cbonsai saver/cbonsai saver/cbonsai_saverView.m"
+COMMAND_LINE_PATH="cbonsai saver/cbonsai saver/CBCommandLine.m"
 PROJECT_PATH="cbonsai saver/cbonsai saver.xcodeproj/project.pbxproj"
 BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
+BUILD_SOURCE_SCRIPT_PATH="scripts/build-cbonsai-source.sh"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
+CI_WORKFLOW_PATH=".github/workflows/ci.yml"
 FORMULA_PATH="Formula/cbonsai-saver.rb"
 HOMEBREW_DOC_PATH="HOMEBREW.md"
 LICENSE_PATH="LICENSE"
@@ -42,6 +45,7 @@ if [ ! -f "$MANUAL_PATH" ]; then
 fi
 
 sh -n "$BUNDLE_SCRIPT_PATH"
+sh -n "$BUILD_SOURCE_SCRIPT_PATH"
 sh -n "$RELEASE_SCRIPT_PATH"
 
 if [ ! -f "$FORMULA_PATH" ]; then
@@ -69,6 +73,41 @@ if [ ! -f "$THIRD_PARTY_NOTICES_PATH" ] || ! grep -Fq 'GPL-3.0-or-later' "$THIRD
   exit 1
 fi
 
+if [ ! -f "$CI_WORKFLOW_PATH" ]; then
+  echo "Missing GitHub Actions workflow: $CI_WORKFLOW_PATH" >&2
+  exit 1
+fi
+
+if grep -Fq 'actions/checkout@v4' "$CI_WORKFLOW_PATH"; then
+  echo "GitHub Actions checkout should be pinned to a commit SHA." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' "$CI_WORKFLOW_PATH"; then
+  echo "GitHub Actions checkout pin is missing or changed." >&2
+  exit 1
+fi
+
+if grep -Fq 'runs-on: macos-latest' "$CI_WORKFLOW_PATH"; then
+  echo "GitHub Actions should pin a concrete macOS runner image." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'runs-on: macos-15' "$CI_WORKFLOW_PATH"; then
+  echo "GitHub Actions should use the pinned macos-15 runner." >&2
+  exit 1
+fi
+
+if grep -Fq 'brew install cbonsai' "$CI_WORKFLOW_PATH"; then
+  echo "CI release builds should not install a Homebrew cbonsai binary." >&2
+  exit 1
+fi
+
+if grep -Fq 'GITHUB_ENV' "$CI_WORKFLOW_PATH"; then
+  echo "CI should not pass the cbonsai binary path through GITHUB_ENV." >&2
+  exit 1
+fi
+
 if ! grep -Fq 'releases/download/1.0/cbonsai-saver-1.0.zip' "$FORMULA_PATH"; then
   echo "Homebrew formula should install the 1.0 release zip." >&2
   exit 1
@@ -92,6 +131,49 @@ do
   fi
 done
 
+if ! grep -Fq '75cf844940e5ef825a74f2d5b1551fe81883551b600fecd00748c6aa325f5ab0' "$BUILD_SOURCE_SCRIPT_PATH"; then
+  echo "Verified cbonsai source SHA-256 is missing." >&2
+  exit 1
+fi
+
+for source_hardening_text in \
+  'PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"' \
+  'PKG_CONFIG_PATH=""' \
+  '/opt/homebrew/opt/ncurses/lib/pkgconfig' \
+  'cbonsai source archive contains unexpected paths.' \
+  'cbonsai source archive contains unsafe paths.' \
+  'make -C "$source_dir" WITH_BASH=0 cbonsai'
+do
+  if ! grep -Fq "$source_hardening_text" "$BUILD_SOURCE_SCRIPT_PATH"; then
+    echo "Missing verified-source hardening text: $source_hardening_text" >&2
+    exit 1
+  fi
+done
+
+for bundle_hardening_text in \
+  'Refusing to bundle cbonsai from a non-absolute path' \
+  'Refusing to bundle cbonsai from an unsupported location' \
+  'Refusing to bundle unexpected cbonsai binary name' \
+  'Unsupported cbonsai dependency path' \
+  'codesign --force --sign - --timestamp=none "$1"'
+do
+  if ! grep -Fq "$bundle_hardening_text" "$BUNDLE_SCRIPT_PATH"; then
+    echo "Missing bundle hardening text: $bundle_hardening_text" >&2
+    exit 1
+  fi
+done
+
+for release_hardening_text in \
+  'Invalid release version' \
+  'CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh)"' \
+  'Unexpected verified cbonsai binary path'
+do
+  if ! grep -Fq "$release_hardening_text" "$RELEASE_SCRIPT_PATH"; then
+    echo "Missing release hardening text: $release_hardening_text" >&2
+    exit 1
+  fi
+done
+
 if grep -Fq 'addLabel:@"Executable"' "$VIEW_PATH"; then
   echo "Executable setting should not be present in the configuration sheet." >&2
   exit 1
@@ -104,6 +186,26 @@ fi
 
 if grep -Fq 'CBDefaultExecutablePath' "cbonsai saver/cbonsai saver/CBCommandLine."*; then
   echo "Executable path defaults should not be exposed." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'return @"/usr/bin:/bin:/usr/sbin:/sbin";' "$COMMAND_LINE_PATH"; then
+  echo "Runtime cbonsai PATH should only include system directories." >&2
+  exit 1
+fi
+
+if grep -Fq 'execve("/bin/sh"' "$VIEW_PATH" || grep -Fq 'createShellArgv' "$VIEW_PATH" || grep -Fq 'CBONSAI_EXECUTABLE' "$VIEW_PATH"; then
+  echo "Screen saver should launch bundled cbonsai directly, not through a shell." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'execve(processArgv[0], processArgv, processEnvironment)' "$VIEW_PATH"; then
+  echo "Screen saver should exec the bundled cbonsai argv directly." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'CBMaximumTerminalColumns = 220' "$VIEW_PATH" || ! grep -Fq 'CBMaximumCSIParameterLength = 64' "$VIEW_PATH"; then
+  echo "Terminal parser and grid size should be bounded." >&2
   exit 1
 fi
 
@@ -161,6 +263,17 @@ if grep -Fq 'colorField' "$VIEW_PATH" || grep -Fq 'Tree colour (ANSI indices)' "
   echo "Tree colour should use ANSI colour controls, not a raw index text field." >&2
   exit 1
 fi
+
+for bounded_control in \
+  'self.waitStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.01 max:600.0 increment:0.25]' \
+  'self.multiplierStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:1.0 max:20.0 increment:1.0]' \
+  'self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:1.0 max:200.0 increment:1.0]'
+do
+  if ! grep -Fq "$bounded_control" "$VIEW_PATH"; then
+    echo "Missing bounded configuration control: $bounded_control" >&2
+    exit 1
+  fi
+done
 
 for pot_option in \
   'addItemWithTitle:@"style 1"' \

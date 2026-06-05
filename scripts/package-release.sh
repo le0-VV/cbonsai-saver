@@ -1,6 +1,9 @@
 #!/bin/sh
 set -eu
 
+PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH
+
 cd "$(dirname "$0")/.."
 
 version="${1:-1.0}"
@@ -16,7 +19,22 @@ product="${product_dir}/cbonsai saver.saver"
 staging_dir="${build_root}/staging/cbonsai-saver-${version}"
 archive="${repo_root}/${artifacts_dir}/cbonsai-saver-${version}.zip"
 
+case "$version" in
+  ""|.*|-*|*..*|*[!0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz._-]*)
+    echo "Invalid release version: $version" >&2
+    exit 1
+    ;;
+esac
+
 mkdir -p "$artifacts_dir"
+
+CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh)"
+export CBONSAI_BINARY_PATH
+
+if [ "$CBONSAI_BINARY_PATH" != "${repo_root}/build/upstream/cbonsai-v1.4.2/cbonsai" ]; then
+  echo "Unexpected verified cbonsai binary path: $CBONSAI_BINARY_PATH" >&2
+  exit 1
+fi
 
 xcodebuild \
   -project "$project" \

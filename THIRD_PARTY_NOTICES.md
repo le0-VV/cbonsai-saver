@@ -13,9 +13,10 @@ not depend on a user-installed command-line binary at runtime.
 - Packaging reference: Homebrew `cbonsai` formula
 
 The release package is built from this repository and copies the local
-`cbonsai` executable selected by `scripts/bundle-cbonsai.sh`. When publishing a
-release, make sure the corresponding `cbonsai` source remains available through
-the upstream project or the package source used to build that executable.
+`cbonsai` executable selected by `scripts/bundle-cbonsai.sh`. Official release
+archives are built by `scripts/package-release.sh`, which compiles `cbonsai`
+from the pinned upstream source archive verified by
+`scripts/build-cbonsai-source.sh`.
 
 ## ncurses
 
