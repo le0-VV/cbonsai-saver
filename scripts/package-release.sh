@@ -6,7 +6,7 @@ export PATH
 
 cd "$(dirname "$0")/.."
 
-version="${1:-1.1}"
+version="${1:-1.1.1}"
 repo_root="$(pwd)"
 project="cbonsai saver/cbonsai saver.xcodeproj"
 scheme="cbonsai saver"
@@ -28,6 +28,14 @@ esac
 
 mkdir -p "$artifacts_dir"
 
+sign_screen_saver_bundle()
+{
+  if command -v codesign >/dev/null 2>&1; then
+    codesign --force --deep --sign - --timestamp=none "$1"
+    codesign --verify --deep --strict --verbose=4 "$1"
+  fi
+}
+
 CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh)"
 export CBONSAI_BINARY_PATH
 
@@ -48,6 +56,8 @@ if [ ! -d "$product" ]; then
   echo "Missing built screen saver bundle: $product" >&2
   exit 1
 fi
+
+sign_screen_saver_bundle "$product"
 
 rm -rf "$staging_dir"
 mkdir -p "$staging_dir"

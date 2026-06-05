@@ -122,8 +122,8 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq 'releases/download/1.1/cbonsai-saver-1.1.zip' "$FORMULA_PATH" || ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
-  echo "Homebrew formula and cask should install the 1.1 release zip." >&2
+if ! grep -Fq 'releases/download/1.1.1/cbonsai-saver-1.1.1.zip' "$FORMULA_PATH" || ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
+  echo "Homebrew formula and cask should install the 1.1.1 release zip." >&2
   exit 1
 fi
 
@@ -132,8 +132,8 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "ae87070e2bdcff20caf766a95106a9f3585764b0738c6ff3ffc7bc342723978e"' "$FORMULA_PATH" || ! grep -Fq 'sha256 "ae87070e2bdcff20caf766a95106a9f3585764b0738c6ff3ffc7bc342723978e"' "$CASK_PATH"; then
-  echo "Homebrew formula and cask should use the 1.1 release SHA-256." >&2
+if ! grep -Fq 'sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"' "$FORMULA_PATH" || ! grep -Fq 'sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"' "$CASK_PATH"; then
+  echo "Homebrew formula and cask should use the 1.1.1 release SHA-256." >&2
   exit 1
 fi
 
@@ -152,7 +152,7 @@ done
 
 for cask_text in \
   'cask "cbonsai-saver" do' \
-  'version "1.1"' \
+  'version "1.1.1"' \
   'depends_on arch: :arm64' \
   'depends_on macos: :big_sur' \
   'screen_saver "cbonsai saver.saver"' \
@@ -204,7 +204,9 @@ done
 for release_hardening_text in \
   'Invalid release version' \
   'CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh)"' \
-  'Unexpected verified cbonsai binary path'
+  'Unexpected verified cbonsai binary path' \
+  'codesign --force --deep --sign - --timestamp=none "$1"' \
+  'codesign --verify --deep --strict --verbose=4 "$1"'
 do
   if ! grep -Fq "$release_hardening_text" "$RELEASE_SCRIPT_PATH"; then
     echo "Missing release hardening text: $release_hardening_text" >&2

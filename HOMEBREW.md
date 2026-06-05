@@ -23,10 +23,10 @@ manual linking caveats because formulae should not install into the user's
 Build the release asset before drafting or publishing a GitHub release:
 
 ```sh
-./scripts/package-release.sh 1.1
+./scripts/package-release.sh 1.1.1
 ```
 
-The script writes `build/release/artifacts/cbonsai-saver-1.1.zip` and prints its
+The script writes `build/release/artifacts/cbonsai-saver-1.1.1.zip` and prints its
 SHA-256. The formula and cask URL and SHA-256 must match the uploaded GitHub
 release asset.
 
