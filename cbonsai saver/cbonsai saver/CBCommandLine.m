@@ -67,7 +67,7 @@ NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void)
         CBCbonsaiTimeKey: @0.03,
         CBCbonsaiWaitKey: @3.0,
         CBCbonsaiMessageKey: @"",
-        CBCbonsaiBaseEnabledKey: @NO,
+        CBCbonsaiBaseEnabledKey: @YES,
         CBCbonsaiBaseKey: @1,
         CBCbonsaiLeafKey: @"&",
         CBCbonsaiColorKey: @"2,3,10,11",

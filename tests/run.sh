@@ -72,6 +72,39 @@ if grep -Eq 'add(Label|Checkbox):@"[^"]*\(--' "$VIEW_PATH"; then
   exit 1
 fi
 
+if grep -Fq 'baseEnabledButton' "$VIEW_PATH" || grep -Fq 'baseField' "$VIEW_PATH"; then
+  echo "Pot style should be a pop-up menu, not a checkbox plus integer field." >&2
+  exit 1
+fi
+
+if grep -Fq 'colorField' "$VIEW_PATH" || grep -Fq 'Tree colour (ANSI indices)' "$VIEW_PATH"; then
+  echo "Tree colour should use ANSI colour controls, not a raw index text field." >&2
+  exit 1
+fi
+
+for pot_option in \
+  'addItemWithTitle:@"style 1"' \
+  'addItemWithTitle:@"style 2"' \
+  'addItemWithTitle:@"no pot"'
+do
+  if ! grep -Fq "$pot_option" "$VIEW_PATH"; then
+    echo "Missing pot style menu option: $pot_option" >&2
+    exit 1
+  fi
+done
+
+for color_control in \
+  darkLeafColorPopUpButton \
+  darkWoodColorPopUpButton \
+  lightLeafColorPopUpButton \
+  lightWoodColorPopUpButton
+do
+  if ! grep -Fq "$color_control" "$VIEW_PATH"; then
+    echo "Missing tree colour pop-up control: $color_control" >&2
+    exit 1
+  fi
+done
+
 if grep -Fq 'id="live"' "$MANUAL_PATH" || grep -Fq 'id="infinite"' "$MANUAL_PATH"; then
   echo "Live and infinite should not have setting manual anchors." >&2
   exit 1
@@ -124,7 +157,7 @@ Tree growth interval (seconds)
 Growth restart wait time (seconds)
 Pot style
 Leaf character
-Tree colour (ANSI indices)
+Tree colour
 Tree density
 Branch lifetime duration (steps)
 EOF
@@ -143,9 +176,9 @@ done <<'EOF'
 Delay between growth steps.
 Delay before restarting growth.
 Text rendered with the tree.
-Styles 1 or 2, or use 0 for no pot.
+Choose style 1, style 2, or no pot.
 Character used for leaves.
-ANSI colour indices.
+Choose fixed ANSI colours.
 Branch density.
 How long branches keep growing.
 Print final tree.

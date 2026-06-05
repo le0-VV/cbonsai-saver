@@ -30,6 +30,11 @@ static const CGFloat CBConfigurationSheetHeight = 620.0;
 static NSString * const CBManualResourceName = @"cbonsai-manual";
 static const CGFloat CBHelpButtonSize = 20.0;
 static const CGFloat CBHelpButtonGap = 8.0;
+static const NSInteger CBDefaultBaseStyle = 1;
+static const NSInteger CBDefaultDarkLeafColor = 2;
+static const NSInteger CBDefaultDarkWoodColor = 3;
+static const NSInteger CBDefaultLightLeafColor = 10;
+static const NSInteger CBDefaultLightWoodColor = 11;
 
 typedef struct {
     unichar character;
@@ -98,6 +103,95 @@ static NSColor *CBColorForANSIIndex(NSInteger index)
     }
 
     return [NSColor whiteColor];
+}
+
+static NSArray<NSNumber *> *CBNamedANSIColorIndexes(void)
+{
+    static NSArray<NSNumber *> *indexes;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        indexes = @[@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, @10, @11, @12, @13, @14, @15];
+    });
+    return indexes;
+}
+
+static NSArray<NSNumber *> *CBDefaultTreeColorIndexes(void)
+{
+    return @[
+        @(CBDefaultDarkLeafColor),
+        @(CBDefaultDarkWoodColor),
+        @(CBDefaultLightLeafColor),
+        @(CBDefaultLightWoodColor),
+    ];
+}
+
+static NSString *CBANSIColorNameForIndex(NSInteger index)
+{
+    switch (index) {
+        case 0:
+            return @"Black";
+        case 1:
+            return @"Red";
+        case 2:
+            return @"Green";
+        case 3:
+            return @"Yellow";
+        case 4:
+            return @"Blue";
+        case 5:
+            return @"Magenta";
+        case 6:
+            return @"Cyan";
+        case 7:
+            return @"White";
+        case 8:
+            return @"Bright black";
+        case 9:
+            return @"Bright red";
+        case 10:
+            return @"Bright green";
+        case 11:
+            return @"Bright yellow";
+        case 12:
+            return @"Bright blue";
+        case 13:
+            return @"Bright magenta";
+        case 14:
+            return @"Bright cyan";
+        case 15:
+            return @"Bright white";
+        default:
+            return [NSString stringWithFormat:@"ANSI %ld", (long)index];
+    }
+}
+
+static NSArray<NSNumber *> *CBTreeColorIndexesFromString(NSString *string)
+{
+    if (![string isKindOfClass:NSString.class]) {
+        return CBDefaultTreeColorIndexes();
+    }
+
+    NSArray<NSString *> *components = [string componentsSeparatedByString:@","];
+    if (components.count != 4) {
+        return CBDefaultTreeColorIndexes();
+    }
+
+    NSMutableArray<NSNumber *> *indexes = [NSMutableArray arrayWithCapacity:4];
+    NSCharacterSet *whitespace = NSCharacterSet.whitespaceAndNewlineCharacterSet;
+    for (NSString *component in components) {
+        NSString *trimmedComponent = [component stringByTrimmingCharactersInSet:whitespace];
+        NSScanner *scanner = [NSScanner scannerWithString:trimmedComponent];
+        scanner.charactersToBeSkipped = nil;
+
+        NSInteger index = 0;
+        if (trimmedComponent.length == 0 || ![scanner scanInteger:&index] || !scanner.isAtEnd || index < 0 || index > 255) {
+            return CBDefaultTreeColorIndexes();
+        }
+
+        [indexes addObject:@(index)];
+    }
+
+    return indexes;
 }
 
 static NSUInteger CBParameterAt(NSArray<NSNumber *> *parameters, NSUInteger index, NSUInteger defaultValue)
@@ -727,10 +821,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic, strong) NSTextField *waitField;
 @property (nonatomic, strong) NSStepper *waitStepper;
 @property (nonatomic, strong) NSTextField *messageField;
-@property (nonatomic, strong) NSButton *baseEnabledButton;
-@property (nonatomic, strong) NSTextField *baseField;
+@property (nonatomic, strong) NSPopUpButton *basePopUpButton;
 @property (nonatomic, strong) NSTextField *leafField;
-@property (nonatomic, strong) NSTextField *colorField;
+@property (nonatomic, strong) NSPopUpButton *darkLeafColorPopUpButton;
+@property (nonatomic, strong) NSPopUpButton *darkWoodColorPopUpButton;
+@property (nonatomic, strong) NSPopUpButton *lightLeafColorPopUpButton;
+@property (nonatomic, strong) NSPopUpButton *lightWoodColorPopUpButton;
 @property (nonatomic, strong) NSTextField *multiplierField;
 @property (nonatomic, strong) NSStepper *multiplierStepper;
 @property (nonatomic, strong) NSTextField *lifeField;
@@ -1204,7 +1300,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [contentView addSubview:scrollView];
 
     CGFloat documentWidth = NSWidth(scrollView.frame) - 18.0;
-    CBFlippedView *documentView = [[CBFlippedView alloc] initWithFrame:NSMakeRect(0, 0, documentWidth, 790)];
+    CBFlippedView *documentView = [[CBFlippedView alloc] initWithFrame:NSMakeRect(0, 0, documentWidth, 840)];
     scrollView.documentView = documentView;
 
     CGFloat y = 18.0;
@@ -1236,10 +1332,11 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self addHelpButtonForAnchor:@"message" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    self.baseEnabledButton = [self addCheckbox:@"Pot style" toView:documentView frame:NSMakeRect(labelX, y - 2, 280, 24)];
-    self.baseField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
-    [self setToolTip:@"Styles 1 or 2, or use 0 for no pot." forViews:@[self.baseEnabledButton, self.baseField]];
-    [self addHelpButtonForAnchor:@"base" toView:documentView frame:NSMakeRect(fieldX + 90.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    NSTextField *baseLabel = [self addLabel:@"Pot style" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
+    self.basePopUpButton = [self addPopUpButtonToView:documentView frame:NSMakeRect(fieldX, y - 3, 180, 26)];
+    [self addPotStyleItemsToPopUpButton:self.basePopUpButton];
+    [self setToolTip:@"Choose style 1, style 2, or no pot." forViews:@[baseLabel, self.basePopUpButton]];
+    [self addHelpButtonForAnchor:@"base" toView:documentView frame:NSMakeRect(fieldX + 188.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     NSTextField *leafLabel = [self addLabel:@"Leaf character" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
@@ -1248,11 +1345,34 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self addHelpButtonForAnchor:@"leaf" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    NSTextField *colorLabel = [self addLabel:@"Tree colour (ANSI indices)" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
-    self.colorField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self setToolTip:@"ANSI colour indices." forViews:@[colorLabel, self.colorField]];
-    [self addHelpButtonForAnchor:@"color" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 34.0;
+    NSTextField *colorLabel = [self addLabel:@"Tree colour" toView:documentView frame:NSMakeRect(labelX, y + 22, 280, 24)];
+    CGFloat colorGap = 12.0;
+    CGFloat colorColumnWidth = floor((fieldWidth - colorGap) / 2.0);
+    CGFloat colorSecondColumnX = fieldX + colorColumnWidth + colorGap;
+    NSTextField *darkLeafColorLabel = [self addCaptionLabel:@"Dark leaves" toView:documentView frame:NSMakeRect(fieldX, y, colorColumnWidth, 16)];
+    self.darkLeafColorPopUpButton = [self addPopUpButtonToView:documentView frame:NSMakeRect(fieldX, y + 16, colorColumnWidth, 26)];
+    NSTextField *darkWoodColorLabel = [self addCaptionLabel:@"Dark wood" toView:documentView frame:NSMakeRect(colorSecondColumnX, y, colorColumnWidth, 16)];
+    self.darkWoodColorPopUpButton = [self addPopUpButtonToView:documentView frame:NSMakeRect(colorSecondColumnX, y + 16, colorColumnWidth, 26)];
+    NSTextField *lightLeafColorLabel = [self addCaptionLabel:@"Light leaves" toView:documentView frame:NSMakeRect(fieldX, y + 46, colorColumnWidth, 16)];
+    self.lightLeafColorPopUpButton = [self addPopUpButtonToView:documentView frame:NSMakeRect(fieldX, y + 62, colorColumnWidth, 26)];
+    NSTextField *lightWoodColorLabel = [self addCaptionLabel:@"Light wood" toView:documentView frame:NSMakeRect(colorSecondColumnX, y + 46, colorColumnWidth, 16)];
+    self.lightWoodColorPopUpButton = [self addPopUpButtonToView:documentView frame:NSMakeRect(colorSecondColumnX, y + 62, colorColumnWidth, 26)];
+    for (NSPopUpButton *button in @[self.darkLeafColorPopUpButton, self.darkWoodColorPopUpButton, self.lightLeafColorPopUpButton, self.lightWoodColorPopUpButton]) {
+        [self addANSIColorItemsToPopUpButton:button];
+    }
+    [self setToolTip:@"Choose fixed ANSI colours." forViews:@[
+        colorLabel,
+        darkLeafColorLabel,
+        self.darkLeafColorPopUpButton,
+        darkWoodColorLabel,
+        self.darkWoodColorPopUpButton,
+        lightLeafColorLabel,
+        self.lightLeafColorPopUpButton,
+        lightWoodColorLabel,
+        self.lightWoodColorPopUpButton,
+    ]];
+    [self addHelpButtonForAnchor:@"color" toView:documentView frame:NSMakeRect(helpButtonX, y + 34, CBHelpButtonSize, CBHelpButtonSize)];
+    y += 98.0;
 
     NSTextField *multiplierLabel = [self addLabel:@"Tree density" toView:documentView frame:NSMakeRect(labelX, y, 280, 24)];
     self.multiplierField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
@@ -1330,6 +1450,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return label;
 }
 
+- (NSTextField *)addCaptionLabel:(NSString *)title toView:(NSView *)view frame:(NSRect)frame
+{
+    NSTextField *label = [self addLabel:title toView:view frame:frame];
+    label.font = [NSFont systemFontOfSize:11.0];
+    label.textColor = NSColor.secondaryLabelColor;
+    return label;
+}
+
 - (NSTextField *)addTextFieldToView:(NSView *)view frame:(NSRect)frame
 {
     NSTextField *field = [[NSTextField alloc] initWithFrame:frame];
@@ -1341,6 +1469,13 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 {
     NSButton *button = [NSButton checkboxWithTitle:title target:self action:@selector(optionCheckboxChanged:)];
     button.frame = frame;
+    [view addSubview:button];
+    return button;
+}
+
+- (NSPopUpButton *)addPopUpButtonToView:(NSView *)view frame:(NSRect)frame
+{
+    NSPopUpButton *button = [[NSPopUpButton alloc] initWithFrame:frame pullsDown:NO];
     [view addSubview:button];
     return button;
 }
@@ -1375,6 +1510,48 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return stepper;
 }
 
+- (void)addPotStyleItemsToPopUpButton:(NSPopUpButton *)button
+{
+    [button removeAllItems];
+    [button addItemWithTitle:@"style 1"];
+    button.lastItem.tag = 1;
+    [button addItemWithTitle:@"style 2"];
+    button.lastItem.tag = 2;
+    [button addItemWithTitle:@"no pot"];
+    button.lastItem.tag = 0;
+}
+
+- (void)addANSIColorItemsToPopUpButton:(NSPopUpButton *)button
+{
+    [button removeAllItems];
+    for (NSNumber *index in CBNamedANSIColorIndexes()) {
+        [self addANSIColorIndex:index.integerValue toPopUpButton:button];
+    }
+}
+
+- (void)addANSIColorIndex:(NSInteger)index toPopUpButton:(NSPopUpButton *)button
+{
+    [button addItemWithTitle:CBANSIColorNameForIndex(index)];
+    NSMenuItem *item = button.lastItem;
+    item.tag = index;
+    item.image = [self swatchImageForANSIColorIndex:index];
+}
+
+- (NSImage *)swatchImageForANSIColorIndex:(NSInteger)index
+{
+    NSImage *image = [[NSImage alloc] initWithSize:NSMakeSize(14.0, 14.0)];
+    [image lockFocus];
+    NSRect rect = NSMakeRect(1.0, 1.0, 12.0, 12.0);
+    NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:rect xRadius:2.0 yRadius:2.0];
+    [CBColorForANSIIndex(index) setFill];
+    [path fill];
+    [[NSColor colorWithCalibratedWhite:0.0 alpha:0.35] setStroke];
+    path.lineWidth = 1.0;
+    [path stroke];
+    [image unlockFocus];
+    return image;
+}
+
 - (void)loadConfigurationFields
 {
     NSDictionary<NSString *, id> *options = self.configuredCbonsaiOptions;
@@ -1382,10 +1559,10 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self setDoubleField:self.timeField stepper:self.timeStepper value:[self doubleOption:options key:CBCbonsaiTimeKey]];
     [self setDoubleField:self.waitField stepper:self.waitStepper value:[self doubleOption:options key:CBCbonsaiWaitKey]];
     self.messageField.stringValue = [self stringOption:options key:CBCbonsaiMessageKey];
-    self.baseEnabledButton.state = [self boolOption:options key:CBCbonsaiBaseEnabledKey] ? NSControlStateValueOn : NSControlStateValueOff;
-    self.baseField.stringValue = [NSString stringWithFormat:@"%ld", (long)[self integerOption:options key:CBCbonsaiBaseKey]];
+    NSInteger baseStyle = [self boolOption:options key:CBCbonsaiBaseEnabledKey] ? [self integerOption:options key:CBCbonsaiBaseKey] : CBDefaultBaseStyle;
+    [self selectPopUpButton:self.basePopUpButton tag:baseStyle fallbackTag:CBDefaultBaseStyle];
     self.leafField.stringValue = [self stringOption:options key:CBCbonsaiLeafKey];
-    self.colorField.stringValue = [self stringOption:options key:CBCbonsaiColorKey];
+    [self selectColorPopUpButtonsWithColorString:[self stringOption:options key:CBCbonsaiColorKey]];
     [self setIntegerField:self.multiplierField stepper:self.multiplierStepper value:[self integerOption:options key:CBCbonsaiMultiplierKey]];
     [self setIntegerField:self.lifeField stepper:self.lifeStepper value:[self integerOption:options key:CBCbonsaiLifeKey]];
     self.printButton.state = [self boolOption:options key:CBCbonsaiPrintKey] ? NSControlStateValueOn : NSControlStateValueOff;
@@ -1411,10 +1588,10 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [defaults setDouble:time forKey:CBCbonsaiTimeKey];
     [defaults setDouble:wait forKey:CBCbonsaiWaitKey];
     [defaults setObject:[self trimmedStringFromField:self.messageField] forKey:CBCbonsaiMessageKey];
-    [defaults setBool:self.baseEnabledButton.state == NSControlStateValueOn forKey:CBCbonsaiBaseEnabledKey];
-    [defaults setInteger:self.baseField.integerValue forKey:CBCbonsaiBaseKey];
+    [defaults setBool:YES forKey:CBCbonsaiBaseEnabledKey];
+    [defaults setInteger:[self selectedTagForPopUpButton:self.basePopUpButton fallbackTag:CBDefaultBaseStyle] forKey:CBCbonsaiBaseKey];
     [defaults setObject:[self trimmedStringFromField:self.leafField] forKey:CBCbonsaiLeafKey];
-    [defaults setObject:[self trimmedStringFromField:self.colorField] forKey:CBCbonsaiColorKey];
+    [defaults setObject:[self colorStringFromColorPopUpButtons] forKey:CBCbonsaiColorKey];
     [defaults setInteger:multiplier forKey:CBCbonsaiMultiplierKey];
     [defaults setInteger:life forKey:CBCbonsaiLifeKey];
     [defaults setBool:self.printButton.state == NSControlStateValueOn forKey:CBCbonsaiPrintKey];
@@ -1476,7 +1653,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)updateOptionalFieldStates
 {
-    self.baseField.enabled = self.baseEnabledButton.state == NSControlStateValueOn;
     self.seedField.enabled = self.seedEnabledButton.state == NSControlStateValueOn;
     self.savePathField.enabled = self.saveEnabledButton.state == NSControlStateValueOn;
     self.loadPathField.enabled = self.loadEnabledButton.state == NSControlStateValueOn;
@@ -1521,6 +1697,46 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (NSString *)trimmedStringFromField:(NSTextField *)field
 {
     return [field.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+}
+
+- (void)selectPopUpButton:(NSPopUpButton *)button tag:(NSInteger)tag fallbackTag:(NSInteger)fallbackTag
+{
+    NSMenuItem *item = [button.menu itemWithTag:tag] ?: [button.menu itemWithTag:fallbackTag];
+    if (item != nil) {
+        [button selectItem:item];
+    }
+}
+
+- (void)selectANSIColorIndex:(NSInteger)index forPopUpButton:(NSPopUpButton *)button fallbackIndex:(NSInteger)fallbackIndex
+{
+    if ([button.menu itemWithTag:index] == nil && index >= 0 && index <= 255) {
+        [self addANSIColorIndex:index toPopUpButton:button];
+    }
+    [self selectPopUpButton:button tag:index fallbackTag:fallbackIndex];
+}
+
+- (void)selectColorPopUpButtonsWithColorString:(NSString *)colorString
+{
+    NSArray<NSNumber *> *indexes = CBTreeColorIndexesFromString(colorString);
+    [self selectANSIColorIndex:indexes[0].integerValue forPopUpButton:self.darkLeafColorPopUpButton fallbackIndex:CBDefaultDarkLeafColor];
+    [self selectANSIColorIndex:indexes[1].integerValue forPopUpButton:self.darkWoodColorPopUpButton fallbackIndex:CBDefaultDarkWoodColor];
+    [self selectANSIColorIndex:indexes[2].integerValue forPopUpButton:self.lightLeafColorPopUpButton fallbackIndex:CBDefaultLightLeafColor];
+    [self selectANSIColorIndex:indexes[3].integerValue forPopUpButton:self.lightWoodColorPopUpButton fallbackIndex:CBDefaultLightWoodColor];
+}
+
+- (NSInteger)selectedTagForPopUpButton:(NSPopUpButton *)button fallbackTag:(NSInteger)fallbackTag
+{
+    NSMenuItem *item = button.selectedItem;
+    return item != nil ? item.tag : fallbackTag;
+}
+
+- (NSString *)colorStringFromColorPopUpButtons
+{
+    NSInteger darkLeaf = [self selectedTagForPopUpButton:self.darkLeafColorPopUpButton fallbackTag:CBDefaultDarkLeafColor];
+    NSInteger darkWood = [self selectedTagForPopUpButton:self.darkWoodColorPopUpButton fallbackTag:CBDefaultDarkWoodColor];
+    NSInteger lightLeaf = [self selectedTagForPopUpButton:self.lightLeafColorPopUpButton fallbackTag:CBDefaultLightLeafColor];
+    NSInteger lightWood = [self selectedTagForPopUpButton:self.lightWoodColorPopUpButton fallbackTag:CBDefaultLightWoodColor];
+    return [NSString stringWithFormat:@"%ld,%ld,%ld,%ld", (long)darkLeaf, (long)darkWood, (long)lightLeaf, (long)lightWood];
 }
 
 - (void)cancelConfiguration:(id)sender
