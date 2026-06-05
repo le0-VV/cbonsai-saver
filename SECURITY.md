@@ -26,7 +26,7 @@ In scope:
 - The native macOS screen saver bundle.
 - Process launch, pseudo-terminal handling, and terminal output rendering.
 - Bundling and release packaging scripts.
-- Homebrew tap/formula installation behavior.
+- Homebrew tap/cask installation behavior.
 
 Out of scope:
 

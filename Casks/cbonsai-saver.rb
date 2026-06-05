@@ -13,6 +13,12 @@ cask "cbonsai-saver" do
 
   screen_saver "cbonsai saver.saver"
 
+  postflight do
+    installed_saver = Pathname.new(cask.config.screen_saverdir).expand_path/"cbonsai saver.saver"
+    system_command "/usr/bin/xattr",
+                   args: ["-dr", "com.apple.quarantine", installed_saver.to_s]
+  end
+
   zap trash: [
     "~/Library/Preferences/ByHost/wang.leonard.cbonsai-saver.*",
     "~/Library/Screen Savers/cbonsai saver.saver",

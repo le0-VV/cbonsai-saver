@@ -26,9 +26,6 @@ jobs:
       - name: Run local tests
         run: ./tests/run.sh
 
-      - name: Check Homebrew formula syntax
-        run: ruby -c Formula/cbonsai-saver.rb
-
       - name: Check Homebrew cask syntax
         run: ruby -c Casks/cbonsai-saver.rb
 
@@ -43,7 +40,7 @@ jobs:
         run: brew install ncurses pkgconf
 
       - name: Build release archive
-        run: ./scripts/package-release.sh 1.1
+        run: ./scripts/package-release.sh 1.1.1
 
       - name: Show release archive checksum
-        run: shasum -a 256 build/release/artifacts/cbonsai-saver-1.1.zip
+        run: shasum -a 256 build/release/artifacts/cbonsai-saver-1.1.1.zip

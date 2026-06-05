@@ -34,7 +34,6 @@ BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
 BUILD_SOURCE_SCRIPT_PATH="scripts/build-cbonsai-source.sh"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
 CI_WORKFLOW_PATH=".github/workflows/ci.yml"
-FORMULA_PATH="Formula/cbonsai-saver.rb"
 CASK_PATH="Casks/cbonsai-saver.rb"
 HOMEBREW_DOC_PATH="HOMEBREW.md"
 LICENSE_PATH="LICENSE"
@@ -49,11 +48,6 @@ sh -n "$BUNDLE_SCRIPT_PATH"
 sh -n "$BUILD_SOURCE_SCRIPT_PATH"
 sh -n "$RELEASE_SCRIPT_PATH"
 
-if [ ! -f "$FORMULA_PATH" ]; then
-  echo "Missing Homebrew formula: $FORMULA_PATH" >&2
-  exit 1
-fi
-
 if [ ! -f "$CASK_PATH" ]; then
   echo "Missing Homebrew cask: $CASK_PATH" >&2
   exit 1
@@ -64,8 +58,12 @@ if [ ! -f "$HOMEBREW_DOC_PATH" ]; then
   exit 1
 fi
 
-ruby -c "$FORMULA_PATH" >/dev/null
 ruby -c "$CASK_PATH" >/dev/null
+
+if [ -e "Formula/cbonsai-saver.rb" ]; then
+  echo "Plain brew install should resolve to the cask; do not keep a formula with the same token." >&2
+  exit 1
+fi
 
 if [ ! -f "$LICENSE_PATH" ] || ! grep -Fq 'GNU GENERAL PUBLIC LICENSE' "$LICENSE_PATH"; then
   echo "Missing GPL license file." >&2
@@ -117,38 +115,35 @@ if grep -Fq 'GITHUB_ENV' "$CI_WORKFLOW_PATH"; then
   exit 1
 fi
 
+if grep -Fq 'Check Homebrew formula syntax' "$CI_WORKFLOW_PATH" || grep -Fq 'Formula/cbonsai-saver.rb' "$CI_WORKFLOW_PATH"; then
+  echo "CI should not check a formula for the cask-only tap." >&2
+  exit 1
+fi
+
 if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ruby -c Casks/cbonsai-saver.rb' "$CI_WORKFLOW_PATH"; then
   echo "CI should check Homebrew cask syntax." >&2
   exit 1
 fi
 
-if ! grep -Fq 'releases/download/1.1.1/cbonsai-saver-1.1.1.zip' "$FORMULA_PATH" || ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
-  echo "Homebrew formula and cask should install the 1.1.1 release zip." >&2
+if ! grep -Fq './scripts/package-release.sh 1.1.1' "$CI_WORKFLOW_PATH" || ! grep -Fq 'build/release/artifacts/cbonsai-saver-1.1.1.zip' "$CI_WORKFLOW_PATH"; then
+  echo "CI release build should package the current release version." >&2
   exit 1
 fi
 
-if grep -Fq 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$FORMULA_PATH" "$CASK_PATH"; then
-  echo "Homebrew formula and cask SHA-256 must be set before release." >&2
+if ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
+  echo "Homebrew cask should install the 1.1.1 release zip." >&2
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"' "$FORMULA_PATH" || ! grep -Fq 'sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"' "$CASK_PATH"; then
-  echo "Homebrew formula and cask should use the 1.1.1 release SHA-256." >&2
+if grep -Fq 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$CASK_PATH"; then
+  echo "Homebrew cask SHA-256 must be set before release." >&2
   exit 1
 fi
 
-for formula_text in \
-  'class CbonsaiSaver < Formula' \
-  'license all_of: ["GPL-3.0-or-later", "X11-distribute-modifications-variant"]' \
-  'depends_on arch: :arm64' \
-  '(prefix/"Screen Savers").install "cbonsai saver.saver"' \
-  'assert_path_exists prefix/"Screen Savers/cbonsai saver.saver/Contents/Resources/cbonsai"'
-do
-  if ! grep -Fq "$formula_text" "$FORMULA_PATH"; then
-    echo "Missing Homebrew formula text: $formula_text" >&2
-    exit 1
-  fi
-done
+if ! grep -Fq 'sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.1 release SHA-256." >&2
+  exit 1
+fi
 
 for cask_text in \
   'cask "cbonsai-saver" do' \
@@ -156,6 +151,8 @@ for cask_text in \
   'depends_on arch: :arm64' \
   'depends_on macos: :big_sur' \
   'screen_saver "cbonsai saver.saver"' \
+  'system_command "/usr/bin/xattr"' \
+  'args: ["-dr", "com.apple.quarantine", installed_saver.to_s]' \
   '~/Library/Screen Savers/cbonsai saver.saver'
 do
   if ! grep -Fq "$cask_text" "$CASK_PATH"; then
@@ -164,8 +161,13 @@ do
   fi
 done
 
-if ! grep -Fq 'brew install --cask cbonsai-saver' "$HOMEBREW_DOC_PATH" || ! grep -Fq 'brew install --cask cbonsai-saver' "$FORMULA_PATH"; then
-  echo "Homebrew docs and formula caveats should mention the automatic cask install." >&2
+if ! grep -Fq 'brew install cbonsai-saver' "$HOMEBREW_DOC_PATH" || ! grep -Fq 'brew install --cask cbonsai-saver' "$HOMEBREW_DOC_PATH"; then
+  echo "Homebrew docs should mention plain and explicit cask installs." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbonsai saver.saver"' "$HOMEBREW_DOC_PATH"; then
+  echo "Homebrew docs should include the manual quarantine removal fallback." >&2
   exit 1
 fi
 
