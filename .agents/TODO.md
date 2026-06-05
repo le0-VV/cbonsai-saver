@@ -1,6 +1,6 @@
 - [x] Search Brick memory and record relevant repo instructions.
-- [x] Inspect the current settings UI and resource/build behavior.
-- [x] Add a bundled cbonsai manual with anchors for each setting.
-- [x] Add per-setting help buttons that open the relevant manual section.
-- [x] Verify the manual is packaged and the saver builds.
+- [x] Read the settings implementation and current test script.
+- [x] Add concise tooltips to setting rows and controls.
+- [x] Add a static test for expected tooltip coverage.
+- [x] Verify tests/build and review the diff.
 - [x] Commit the completed logical unit with the required author format.

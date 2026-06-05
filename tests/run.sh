@@ -17,6 +17,7 @@ clang \
 "$BUILD_DIR/CBCommandLineTests"
 
 MANUAL_PATH="cbonsai saver/cbonsai saver/cbonsai-manual.html"
+VIEW_PATH="cbonsai saver/cbonsai saver/cbonsai_saverView.m"
 if [ ! -f "$MANUAL_PATH" ]; then
   echo "Missing bundled cbonsai manual: $MANUAL_PATH" >&2
   exit 1
@@ -48,3 +49,36 @@ do
     exit 1
   fi
 done
+
+while IFS= read -r tooltip
+do
+  if [ -z "$tooltip" ]; then
+    continue
+  fi
+
+  if ! grep -Fq "@\"$tooltip\"" "$VIEW_PATH"; then
+    echo "Missing concise setting tooltip: $tooltip" >&2
+    exit 1
+  fi
+done <<'EOF'
+Command used to launch cbonsai.
+Terminal font size.
+Continuously redraw trees.
+Animate growth.
+Keep cbonsai running.
+Growth delay in seconds.
+Delay after each tree.
+Text rendered with the tree.
+Pass --base when enabled.
+Leaf character list.
+ANSI color list.
+Branch density.
+Branch lifetime.
+Print final tree.
+Fixed random seed.
+Save tree state file.
+Load tree state file.
+Print extra output.
+Show cbonsai help and exit.
+Open manual.
+EOF

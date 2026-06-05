@@ -1133,94 +1133,113 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     CGFloat compactHelpX = fieldX + 118.0;
 
     y = [self addSectionTitle:@"General" toView:documentView y:y];
-    [self addLabel:@"Executable" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
+    NSTextField *executableLabel = [self addLabel:@"Executable" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
     self.executableField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self addHelpButtonForAnchor:@"executable" label:@"Executable" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Command used to launch cbonsai." forViews:@[executableLabel, self.executableField]];
+    [self addHelpButtonForAnchor:@"executable" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 38.0;
 
-    [self addLabel:@"Font size" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
+    NSTextField *fontSizeLabel = [self addLabel:@"Font size" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
     self.fontSizeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 72, 24)];
     self.fontSizeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 80, y - 4, 20, 28) min:8.0 max:48.0 increment:1.0];
-    [self addHelpButtonForAnchor:@"font-size" label:@"Font size" toView:documentView frame:NSMakeRect(fieldX + 108.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Terminal font size." forViews:@[fontSizeLabel, self.fontSizeField, self.fontSizeStepper]];
+    [self addHelpButtonForAnchor:@"font-size" toView:documentView frame:NSMakeRect(fieldX + 108.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
 
     y = [self addSectionTitle:@"Mode" toView:documentView y:y];
     self.screensaverButton = [self addCheckbox:@"Screensaver (--screensaver)" toView:documentView frame:NSMakeRect(labelX, y - 2, 210, 24)];
-    [self addHelpButtonForAnchor:@"screensaver" label:@"--screensaver" toView:documentView frame:NSMakeRect(labelX + 214.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Continuously redraw trees." forViews:@[self.screensaverButton]];
+    [self addHelpButtonForAnchor:@"screensaver" toView:documentView frame:NSMakeRect(labelX + 214.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     self.liveButton = [self addCheckbox:@"Live (--live)" toView:documentView frame:NSMakeRect(labelX + 260, y - 2, 116, 24)];
-    [self addHelpButtonForAnchor:@"live" label:@"--live" toView:documentView frame:NSMakeRect(labelX + 380.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Animate growth." forViews:@[self.liveButton]];
+    [self addHelpButtonForAnchor:@"live" toView:documentView frame:NSMakeRect(labelX + 380.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     self.infiniteButton = [self addCheckbox:@"Infinite (--infinite)" toView:documentView frame:NSMakeRect(labelX + 420, y - 2, 152, 24)];
-    [self addHelpButtonForAnchor:@"infinite" label:@"--infinite" toView:documentView frame:NSMakeRect(labelX + 576.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Keep cbonsai running." forViews:@[self.infiniteButton]];
+    [self addHelpButtonForAnchor:@"infinite" toView:documentView frame:NSMakeRect(labelX + 576.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 42.0;
 
     y = [self addSectionTitle:@"Timing" toView:documentView y:y];
-    [self addLabel:@"Growth time (--time)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *timeLabel = [self addLabel:@"Growth time (--time)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.timeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.timeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.01 max:60.0 increment:0.01];
-    [self addHelpButtonForAnchor:@"time" label:@"--time" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Growth delay in seconds." forViews:@[timeLabel, self.timeField, self.timeStepper]];
+    [self addHelpButtonForAnchor:@"time" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    [self addLabel:@"Tree wait (--wait)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *waitLabel = [self addLabel:@"Tree wait (--wait)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.waitField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.waitStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:600.0 increment:0.25];
-    [self addHelpButtonForAnchor:@"wait" label:@"--wait" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Delay after each tree." forViews:@[waitLabel, self.waitField, self.waitStepper]];
+    [self addHelpButtonForAnchor:@"wait" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
 
     y = [self addSectionTitle:@"Tree" toView:documentView y:y];
-    [self addLabel:@"Message (--message)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *messageLabel = [self addLabel:@"Message (--message)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.messageField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self addHelpButtonForAnchor:@"message" label:@"--message" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Text rendered with the tree." forViews:@[messageLabel, self.messageField]];
+    [self addHelpButtonForAnchor:@"message" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     self.baseEnabledButton = [self addCheckbox:@"Base (--base)" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
     self.baseField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
-    [self addHelpButtonForAnchor:@"base" label:@"--base" toView:documentView frame:NSMakeRect(fieldX + 90.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Pass --base when enabled." forViews:@[self.baseEnabledButton, self.baseField]];
+    [self addHelpButtonForAnchor:@"base" toView:documentView frame:NSMakeRect(fieldX + 90.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    [self addLabel:@"Leaves (--leaf)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *leafLabel = [self addLabel:@"Leaves (--leaf)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.leafField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self addHelpButtonForAnchor:@"leaf" label:@"--leaf" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Leaf character list." forViews:@[leafLabel, self.leafField]];
+    [self addHelpButtonForAnchor:@"leaf" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    [self addLabel:@"Colors (--color)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *colorLabel = [self addLabel:@"Colors (--color)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.colorField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self addHelpButtonForAnchor:@"color" label:@"--color" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"ANSI color list." forViews:@[colorLabel, self.colorField]];
+    [self addHelpButtonForAnchor:@"color" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    [self addLabel:@"Multiplier (--multiplier)" toView:documentView frame:NSMakeRect(labelX, y, 170, 24)];
+    NSTextField *multiplierLabel = [self addLabel:@"Multiplier (--multiplier)" toView:documentView frame:NSMakeRect(labelX, y, 170, 24)];
     self.multiplierField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.multiplierStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:20.0 increment:1.0];
-    [self addHelpButtonForAnchor:@"multiplier" label:@"--multiplier" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Branch density." forViews:@[multiplierLabel, self.multiplierField, self.multiplierStepper]];
+    [self addHelpButtonForAnchor:@"multiplier" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    [self addLabel:@"Life (--life)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *lifeLabel = [self addLabel:@"Life (--life)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
     self.lifeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:200.0 increment:1.0];
-    [self addHelpButtonForAnchor:@"life" label:@"--life" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Branch lifetime." forViews:@[lifeLabel, self.lifeField, self.lifeStepper]];
+    [self addHelpButtonForAnchor:@"life" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
 
     y = [self addSectionTitle:@"Output" toView:documentView y:y];
     self.printButton = [self addCheckbox:@"Print when finished (--print)" toView:documentView frame:NSMakeRect(labelX, y - 2, 222, 24)];
-    [self addHelpButtonForAnchor:@"print" label:@"--print" toView:documentView frame:NSMakeRect(labelX + 226.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Print final tree." forViews:@[self.printButton]];
+    [self addHelpButtonForAnchor:@"print" toView:documentView frame:NSMakeRect(labelX + 226.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     self.verboseButton = [self addCheckbox:@"Verbose (--verbose)" toView:documentView frame:NSMakeRect(labelX + 280, y - 2, 146, 24)];
-    [self addHelpButtonForAnchor:@"verbose" label:@"--verbose" toView:documentView frame:NSMakeRect(labelX + 430.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Print extra output." forViews:@[self.verboseButton]];
+    [self addHelpButtonForAnchor:@"verbose" toView:documentView frame:NSMakeRect(labelX + 430.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     self.helpButton = [self addCheckbox:@"Show help (--help)" toView:documentView frame:NSMakeRect(labelX + 470, y - 2, 130, 24)];
-    [self addHelpButtonForAnchor:@"help" label:@"--help" toView:documentView frame:NSMakeRect(labelX + 604.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Show cbonsai help and exit." forViews:@[self.helpButton]];
+    [self addHelpButtonForAnchor:@"help" toView:documentView frame:NSMakeRect(labelX + 604.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     self.seedEnabledButton = [self addCheckbox:@"Seed (--seed)" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
     self.seedField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 120, 24)];
-    [self addHelpButtonForAnchor:@"seed" label:@"--seed" toView:documentView frame:NSMakeRect(fieldX + 128.0, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Fixed random seed." forViews:@[self.seedEnabledButton, self.seedField]];
+    [self addHelpButtonForAnchor:@"seed" toView:documentView frame:NSMakeRect(fieldX + 128.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     self.saveEnabledButton = [self addCheckbox:@"Save file (--save)" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
     self.savePathField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self addHelpButtonForAnchor:@"save" label:@"--save" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Save tree state file." forViews:@[self.saveEnabledButton, self.savePathField]];
+    [self addHelpButtonForAnchor:@"save" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
     self.loadEnabledButton = [self addCheckbox:@"Load file (--load)" toView:documentView frame:NSMakeRect(labelX, y - 2, 170, 24)];
     self.loadPathField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self addHelpButtonForAnchor:@"load" label:@"--load" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
+    [self setToolTip:@"Load tree state file." forViews:@[self.loadEnabledButton, self.loadPathField]];
+    [self addHelpButtonForAnchor:@"load" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
 
     NSButton *cancelButton = [[NSButton alloc] initWithFrame:NSMakeRect(CBConfigurationSheetWidth - 220, 18, 90, 30)];
     cancelButton.title = @"Cancel";
@@ -1247,11 +1266,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return y + 28.0;
 }
 
-- (void)addLabel:(NSString *)title toView:(NSView *)view frame:(NSRect)frame
+- (NSTextField *)addLabel:(NSString *)title toView:(NSView *)view frame:(NSRect)frame
 {
     NSTextField *label = [NSTextField labelWithString:title];
     label.frame = frame;
     [view addSubview:label];
+    return label;
 }
 
 - (NSTextField *)addTextFieldToView:(NSView *)view frame:(NSRect)frame
@@ -1269,15 +1289,22 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return button;
 }
 
-- (NSButton *)addHelpButtonForAnchor:(NSString *)anchor label:(NSString *)label toView:(NSView *)view frame:(NSRect)frame
+- (NSButton *)addHelpButtonForAnchor:(NSString *)anchor toView:(NSView *)view frame:(NSRect)frame
 {
     NSButton *button = [NSButton buttonWithTitle:@"" target:self action:@selector(openManualSection:)];
     button.frame = frame;
     button.bezelStyle = NSBezelStyleHelpButton;
     button.identifier = anchor;
-    button.toolTip = [NSString stringWithFormat:@"Open manual section for %@.", label];
+    button.toolTip = @"Open manual.";
     [view addSubview:button];
     return button;
+}
+
+- (void)setToolTip:(NSString *)toolTip forViews:(NSArray<NSView *> *)views
+{
+    for (NSView *view in views) {
+        view.toolTip = toolTip;
+    }
 }
 
 - (NSStepper *)addStepperToView:(NSView *)view frame:(NSRect)frame min:(double)minimum max:(double)maximum increment:(double)increment
