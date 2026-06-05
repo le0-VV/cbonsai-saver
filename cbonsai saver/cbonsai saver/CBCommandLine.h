@@ -29,7 +29,6 @@ extern NSString * const CBCbonsaiLoadPathKey;
 extern NSString * const CBCbonsaiVerboseKey;
 extern NSString * const CBCbonsaiHelpKey;
 
-NSString *CBDefaultExecutablePath(void);
 NSString *CBDefaultEnvironmentPath(void);
 NSDictionary<NSString *, id> *CBDefaultCbonsaiOptions(void);
 NSArray<NSString *> *CBCbonsaiArgumentsFromOptions(NSDictionary<NSString *, id> *options);

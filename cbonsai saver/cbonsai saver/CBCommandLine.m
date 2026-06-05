@@ -59,11 +59,6 @@ static NSString *CBFormatDouble(double value)
     return [NSString stringWithFormat:@"%.6g", value];
 }
 
-NSString *CBDefaultExecutablePath(void)
-{
-    return @"cbonsai";
-}
-
 NSString *CBDefaultEnvironmentPath(void)
 {
     return @"/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";

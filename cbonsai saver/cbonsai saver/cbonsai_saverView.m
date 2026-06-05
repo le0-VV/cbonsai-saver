@@ -20,7 +20,6 @@
 #import <util.h>
 
 static NSString * const CBSettingsModuleName = @"wang.leonard.cbonsai-saver";
-static NSString * const CBExecutablePathKey = @"executablePath";
 static NSString * const CBFontSizeKey = @"fontSize";
 static const CGFloat CBDefaultFontSize = 14.0;
 static const NSInteger CBDefaultForegroundColor = 7;
@@ -657,7 +656,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic) pid_t childProcessIdentifier;
 @property (nonatomic) BOOL stoppingChildProcess;
 @property (nonatomic, strong) NSWindow *configurationSheet;
-@property (nonatomic, strong) NSTextField *executableField;
 @property (nonatomic, strong) NSTextField *fontSizeField;
 @property (nonatomic, strong) NSStepper *fontSizeStepper;
 @property (nonatomic, strong) NSButton *screensaverButton;
@@ -782,7 +780,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 {
     ScreenSaverDefaults *defaults = [ScreenSaverDefaults defaultsForModuleWithName:CBSettingsModuleName];
     NSMutableDictionary<NSString *, id> *registeredDefaults = [@{
-        CBExecutablePathKey: CBDefaultExecutablePath(),
         CBFontSizeKey: @(CBDefaultFontSize),
     } mutableCopy];
     [registeredDefaults addEntriesFromDictionary:CBDefaultCbonsaiOptions()];
@@ -793,12 +790,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)registerDefaultSettings
 {
     (void)[self screenSaverDefaults];
-}
-
-- (NSString *)configuredExecutablePath
-{
-    NSString *path = [[self screenSaverDefaults] stringForKey:CBExecutablePathKey];
-    return (path.length > 0) ? path : CBDefaultExecutablePath();
 }
 
 - (NSDictionary<NSString *, id> *)configuredCbonsaiOptions
@@ -873,9 +864,9 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return;
     }
 
-    NSString *executablePath = [self.configuredExecutablePath stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString *executablePath = self.bundledCbonsaiPath;
     if (executablePath.length == 0) {
-        [self.terminalBuffer showStatusMessage:@"cbonsai executable path is empty."];
+        [self.terminalBuffer showStatusMessage:@"Bundled cbonsai binary is missing."];
         [self setNeedsDisplay:YES];
         return;
     }
@@ -934,6 +925,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         nil];
     [shellArguments addObjectsFromArray:arguments];
     return CBCStringArrayFromStrings(shellArguments);
+}
+
+- (NSString *)bundledCbonsaiPath
+{
+    NSURL *url = [[NSBundle bundleForClass:self.class] URLForResource:@"cbonsai" withExtension:nil];
+    return url.path ?: @"";
 }
 
 - (char **)createShellEnvironmentWithExecutablePath:(NSString *)executablePath
@@ -1133,12 +1130,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     CGFloat compactHelpX = fieldX + 118.0;
 
     y = [self addSectionTitle:@"General" toView:documentView y:y];
-    NSTextField *executableLabel = [self addLabel:@"Executable" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
-    self.executableField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self setToolTip:@"Command used to launch cbonsai." forViews:@[executableLabel, self.executableField]];
-    [self addHelpButtonForAnchor:@"executable" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
-    y += 38.0;
-
     NSTextField *fontSizeLabel = [self addLabel:@"Font size" toView:documentView frame:NSMakeRect(labelX, y, 150, 24)];
     self.fontSizeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 72, 24)];
     self.fontSizeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 80, y - 4, 20, 28) min:8.0 max:48.0 increment:1.0];
@@ -1322,7 +1313,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)loadConfigurationFields
 {
     NSDictionary<NSString *, id> *options = self.configuredCbonsaiOptions;
-    self.executableField.stringValue = self.configuredExecutablePath;
     self.fontSizeField.stringValue = [NSString stringWithFormat:@"%.0f", self.configuredFontSize];
     self.fontSizeStepper.doubleValue = self.configuredFontSize;
 
@@ -1360,7 +1350,6 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     NSInteger life = MIN(MAX(self.lifeField.integerValue, 0), 200);
 
     ScreenSaverDefaults *defaults = [self screenSaverDefaults];
-    [defaults setObject:self.executableField.stringValue forKey:CBExecutablePathKey];
     [defaults setDouble:fontSize forKey:CBFontSizeKey];
     [defaults setBool:self.screensaverButton.state == NSControlStateValueOn forKey:CBCbonsaiScreensaverKey];
     [defaults setBool:self.liveButton.state == NSControlStateValueOn forKey:CBCbonsaiLiveKey];

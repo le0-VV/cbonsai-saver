@@ -18,13 +18,31 @@ clang \
 
 MANUAL_PATH="cbonsai saver/cbonsai saver/cbonsai-manual.html"
 VIEW_PATH="cbonsai saver/cbonsai saver/cbonsai_saverView.m"
+PROJECT_PATH="cbonsai saver/cbonsai saver.xcodeproj/project.pbxproj"
+BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
 if [ ! -f "$MANUAL_PATH" ]; then
   echo "Missing bundled cbonsai manual: $MANUAL_PATH" >&2
   exit 1
 fi
 
+sh -n "$BUNDLE_SCRIPT_PATH"
+
+if grep -Fq 'addLabel:@"Executable"' "$VIEW_PATH"; then
+  echo "Executable setting should not be present in the configuration sheet." >&2
+  exit 1
+fi
+
+if grep -Fq 'CBDefaultExecutablePath' "cbonsai saver/cbonsai saver/CBCommandLine."*; then
+  echo "Executable path defaults should not be exposed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "Bundle cbonsai" "$PROJECT_PATH" || ! grep -Fq "bundle-cbonsai.sh" "$PROJECT_PATH"; then
+  echo "Xcode target should bundle cbonsai during build." >&2
+  exit 1
+fi
+
 for anchor in \
-  executable \
   font-size \
   screensaver \
   live \
@@ -61,7 +79,6 @@ do
     exit 1
   fi
 done <<'EOF'
-Command used to launch cbonsai.
 Terminal font size.
 Continuously redraw trees.
 Animate growth.

@@ -24,7 +24,6 @@ static void CBAssertArguments(NSDictionary<NSString *, id> *options, NSArray<NSS
 int main(void)
 {
     @autoreleasepool {
-        CBAssert([CBDefaultExecutablePath() isEqualToString:@"cbonsai"], @"Default executable should use PATH lookup for original cbonsai.");
         CBAssert([CBDefaultEnvironmentPath() containsString:@"/opt/homebrew/bin"], @"Default PATH should include Homebrew on Apple Silicon.");
 
         CBAssertArguments(@{}, (@[

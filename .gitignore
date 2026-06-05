@@ -26,6 +26,7 @@ xcuserdata/
 *.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
 *.xcworkspace/xcshareddata/*.xccheckout
 *.xcworkspace/xcshareddata/*.xcscmblueprint
+**/com.apple.DeveloperTools/
 
 # Obj‑C / Swift specific
 *.hmap

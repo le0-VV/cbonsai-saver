@@ -66,6 +66,7 @@
 				67B3CE062DF98429009A3289 /* Sources */,
 				67B3CE072DF98429009A3289 /* Frameworks */,
 				67B3CE082DF98429009A3289 /* Resources */,
+				CB0B0A510000000000000001 /* Bundle cbonsai */,
 			);
 			buildRules = (
 			);
@@ -123,6 +124,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		CB0B0A510000000000000001 /* Bundle cbonsai */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle cbonsai";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/cbonsai",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/../scripts/bundle-cbonsai.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		67B3CE062DF98429009A3289 /* Sources */ = {
@@ -256,6 +280,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "cbonsai screen saver";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -276,6 +301,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "cbonsai screen saver";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
