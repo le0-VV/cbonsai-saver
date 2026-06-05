@@ -197,6 +197,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (void)resizeToColumns:(NSUInteger)columns rows:(NSUInteger)rows;
 - (void)appendData:(NSData *)data;
 - (CBTerminalCell)cellAtColumn:(NSUInteger)column row:(NSUInteger)row;
+- (CGRect)contentBounds;
 - (void)showStatusMessage:(NSString *)message;
 
 @end
@@ -293,6 +294,39 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return CBTerminalDefaultCell();
     }
     return _cells[row * _columns + column];
+}
+
+- (CGRect)contentBounds
+{
+    BOOL foundContent = NO;
+    NSUInteger minimumColumn = _columns;
+    NSUInteger maximumColumn = 0;
+    NSUInteger minimumRow = _rows;
+    NSUInteger maximumRow = 0;
+
+    for (NSUInteger row = 0; row < _rows; row++) {
+        for (NSUInteger column = 0; column < _columns; column++) {
+            CBTerminalCell cell = _cells[row * _columns + column];
+            if (cell.character == ' ') {
+                continue;
+            }
+
+            foundContent = YES;
+            minimumColumn = MIN(minimumColumn, column);
+            maximumColumn = MAX(maximumColumn, column);
+            minimumRow = MIN(minimumRow, row);
+            maximumRow = MAX(maximumRow, row);
+        }
+    }
+
+    if (!foundContent) {
+        return CGRectMake(0.0, 0.0, 0.0, 0.0);
+    }
+
+    return CGRectMake((CGFloat)minimumColumn,
+                      (CGFloat)minimumRow,
+                      (CGFloat)(maximumColumn - minimumColumn + 1),
+                      (CGFloat)(maximumRow - minimumRow + 1));
 }
 
 - (void)showStatusMessage:(NSString *)message
@@ -737,14 +771,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return;
     }
 
-    CGFloat terminalWidth = (CGFloat)self.terminalBuffer.columns * self.cellWidth;
-    CGFloat terminalHeight = (CGFloat)self.terminalBuffer.rows * self.cellHeight;
-    CGFloat originX = floor((NSWidth(self.bounds) - terminalWidth) / 2.0);
-    CGFloat originY = floor((NSHeight(self.bounds) - terminalHeight) / 2.0);
+    CGPoint origin = CBTerminalContentOriginForBounds(self.bounds.size,
+                                                      CGSizeMake((CGFloat)self.terminalBuffer.columns, (CGFloat)self.terminalBuffer.rows),
+                                                      CGSizeMake(self.cellWidth, self.cellHeight),
+                                                      self.terminalBuffer.contentBounds);
 
     for (NSUInteger row = 0; row < self.terminalBuffer.rows; row++) {
-        [self drawBackgroundsForRow:row originX:originX originY:originY];
-        [self drawTextForRow:row originX:originX originY:originY];
+        [self drawBackgroundsForRow:row originX:origin.x originY:origin.y];
+        [self drawTextForRow:row originX:origin.x originY:origin.y];
     }
 }
 

@@ -38,6 +38,20 @@ int main(void)
         CBAssertNearlyEqual(CBAutomaticTerminalFontSizeForBounds(CGSizeMake(0.0, 0.0), onePointCellSize, NO),
                             10.0,
                             @"Invalid bounds should fall back to the minimum");
+
+        CGPoint centeredOrigin = CBTerminalContentOriginForBounds(CGSizeMake(300.0, 200.0),
+                                                                  CGSizeMake(100.0, 40.0),
+                                                                  CGSizeMake(2.0, 4.0),
+                                                                  CGRectMake(0.0, 0.0, 0.0, 0.0));
+        CBAssertNearlyEqual(centeredOrigin.x, 50.0, @"Empty content should center the terminal grid horizontally");
+        CBAssertNearlyEqual(centeredOrigin.y, 20.0, @"Empty content should center the terminal grid vertically");
+
+        CGPoint contentOrigin = CBTerminalContentOriginForBounds(CGSizeMake(300.0, 200.0),
+                                                                 CGSizeMake(100.0, 40.0),
+                                                                 CGSizeMake(2.0, 4.0),
+                                                                 CGRectMake(10.0, 5.0, 20.0, 10.0));
+        CBAssertNearlyEqual(contentOrigin.x, 110.0, @"Visible content should be horizontally centered");
+        CBAssertNearlyEqual(contentOrigin.y, 124.0, @"Visible content should be bottom aligned with margin");
     }
 
     return 0;

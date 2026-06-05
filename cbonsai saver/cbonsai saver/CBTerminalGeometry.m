@@ -32,3 +32,23 @@ CGFloat CBAutomaticTerminalFontSizeForBounds(CGSize boundsSize, CGSize onePointC
     CGFloat snappedFontSize = floor(fmin(fontSizeForWidth, fontSizeForHeight) * 2.0) / 2.0;
     return CBClamp(snappedFontSize, minimum, maximum);
 }
+
+CGPoint CBTerminalContentOriginForBounds(CGSize boundsSize, CGSize terminalSizeInCells, CGSize cellSize, CGRect contentBoundsInCells)
+{
+    CGFloat terminalWidth = terminalSizeInCells.width * cellSize.width;
+    CGFloat terminalHeight = terminalSizeInCells.height * cellSize.height;
+    if (boundsSize.width <= 0.0 || boundsSize.height <= 0.0 || cellSize.width <= 0.0 || cellSize.height <= 0.0) {
+        return CGPointMake(0.0, 0.0);
+    }
+
+    if (contentBoundsInCells.size.width <= 0.0 || contentBoundsInCells.size.height <= 0.0) {
+        return CGPointMake(floor((boundsSize.width - terminalWidth) / 2.0),
+                           floor((boundsSize.height - terminalHeight) / 2.0));
+    }
+
+    CGFloat contentCenterColumn = contentBoundsInCells.origin.x + (contentBoundsInCells.size.width / 2.0);
+    CGFloat contentBottomRow = contentBoundsInCells.origin.y + contentBoundsInCells.size.height;
+    CGFloat bottomMargin = fmax(cellSize.height * 2.0, boundsSize.height * 0.08);
+    return CGPointMake(floor((boundsSize.width / 2.0) - (contentCenterColumn * cellSize.width)),
+                       floor(boundsSize.height - bottomMargin - (contentBottomRow * cellSize.height)));
+}
