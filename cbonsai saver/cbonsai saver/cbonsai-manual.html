@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cbonsai screen saver option reference</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+      line-height: 1.45;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px;
+      max-width: 860px;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+    }
+
+    h2 {
+      border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+      font-size: 20px;
+      margin: 32px 0 10px;
+      padding-top: 24px;
+    }
+
+    h3 {
+      font-size: 16px;
+      margin: 24px 0 8px;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.95em;
+    }
+
+    .summary {
+      color: color-mix(in srgb, CanvasText 74%, transparent);
+      margin-bottom: 24px;
+    }
+
+    .option {
+      scroll-margin-top: 18px;
+    }
+
+    .meta {
+      color: color-mix(in srgb, CanvasText 68%, transparent);
+    }
+  </style>
+</head>
+<body>
+  <h1>cbonsai screen saver option reference</h1>
+  <p class="summary">These settings are compiled into command-line arguments and passed to the original <code>cbonsai</code> executable when the screen saver starts.</p>
+
+  <h2>General</h2>
+
+  <section class="option" id="executable">
+    <h3>Executable</h3>
+    <p>Path or command name used to launch <code>cbonsai</code>. The default is <code>cbonsai</code>, which keeps using the original binary found through the screen saver's lightweight launch environment.</p>
+  </section>
+
+  <section class="option" id="font-size">
+    <h3>Font size</h3>
+    <p>Terminal font size used by the screen saver renderer. This is a screen saver display setting and is not passed to <code>cbonsai</code>.</p>
+  </section>
+
+  <h2>Mode</h2>
+
+  <section class="option" id="screensaver">
+    <h3><code>--screensaver</code></h3>
+    <p>Runs <code>cbonsai</code> in screen saver mode so it continuously draws new trees without interactive input.</p>
+  </section>
+
+  <section class="option" id="live">
+    <h3><code>--live</code></h3>
+    <p>Shows the tree as it grows instead of only drawing the completed result.</p>
+  </section>
+
+  <section class="option" id="infinite">
+    <h3><code>--infinite</code></h3>
+    <p>Keeps growing trees indefinitely. Use this when you want cbonsai itself to keep running rather than exiting after one tree.</p>
+  </section>
+
+  <h2>Timing</h2>
+
+  <section class="option" id="time">
+    <h3><code>--time=TIME</code></h3>
+    <p>Sets the delay used while the tree grows. Smaller values animate faster; larger values animate slower.</p>
+  </section>
+
+  <section class="option" id="wait">
+    <h3><code>--wait=TIME</code></h3>
+    <p>Sets how long to wait after a tree finishes before starting or exiting, depending on the selected mode.</p>
+  </section>
+
+  <h2>Tree</h2>
+
+  <section class="option" id="message">
+    <h3><code>--message=STR</code></h3>
+    <p>Sets a message for <code>cbonsai</code> to render with the tree. Empty messages are omitted from the command line.</p>
+  </section>
+
+  <section class="option" id="base">
+    <h3><code>--base=INT</code></h3>
+    <p>Sets the tree base style. The saver only passes this argument when the Base checkbox is enabled.</p>
+  </section>
+
+  <section class="option" id="leaf">
+    <h3><code>--leaf=LIST</code></h3>
+    <p>Sets the character list used for leaves. The value is passed as a comma-separated list.</p>
+  </section>
+
+  <section class="option" id="color">
+    <h3><code>--color=LIST</code></h3>
+    <p>Sets the ANSI color list used for leaves. The value is passed as a comma-separated list.</p>
+  </section>
+
+  <section class="option" id="multiplier">
+    <h3><code>--multiplier=INT</code></h3>
+    <p>Controls branch density and growth scale. Larger values generally create fuller trees.</p>
+  </section>
+
+  <section class="option" id="life">
+    <h3><code>--life=INT</code></h3>
+    <p>Controls how long branches continue growing. Larger values generally create taller or more complex trees.</p>
+  </section>
+
+  <h2>Output</h2>
+
+  <section class="option" id="print">
+    <h3><code>--print</code></h3>
+    <p>Prints the completed tree when cbonsai finishes. This is usually less useful for a continuous screen saver, but it is exposed for parity with cbonsai.</p>
+  </section>
+
+  <section class="option" id="seed">
+    <h3><code>--seed=INT</code></h3>
+    <p>Uses a fixed random seed. Enable this when you want deterministic tree output for the same settings.</p>
+  </section>
+
+  <section class="option" id="save">
+    <h3><code>--save=FILE</code></h3>
+    <p>Saves cbonsai output state to a file. The saver only passes this argument when Save file is enabled and the path is not empty.</p>
+  </section>
+
+  <section class="option" id="load">
+    <h3><code>--load=FILE</code></h3>
+    <p>Loads cbonsai output state from a file. The saver only passes this argument when Load file is enabled and the path is not empty.</p>
+  </section>
+
+  <section class="option" id="verbose">
+    <h3><code>--verbose</code></h3>
+    <p>Requests more detailed cbonsai output.</p>
+  </section>
+
+  <section class="option" id="help">
+    <h3><code>--help</code></h3>
+    <p>Prints cbonsai's command-line help and exits. This is useful for checking the installed binary's supported options, but it will not act like a running screen saver.</p>
+  </section>
+
+  <p class="meta">Bundled with cbonsai screen saver for offline option help.</p>
+</body>
+</html>

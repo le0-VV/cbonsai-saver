@@ -1,7 +1,6 @@
 - [x] Search Brick memory and record relevant repo instructions.
-- [x] Inspect the current settings implementation, argument helper, tests, and cbonsai option list.
-- [x] Design typed settings storage and argv compilation for cbonsai options.
-- [x] Implement typed settings controls and launch-time argument compilation.
-- [x] Add or update tests for generated cbonsai argv.
-- [x] Verify tests/build and review the final diff.
+- [x] Inspect the current settings UI and resource/build behavior.
+- [x] Add a bundled cbonsai manual with anchors for each setting.
+- [x] Add per-setting help buttons that open the relevant manual section.
+- [x] Verify the manual is packaged and the saver builds.
 - [x] Commit the completed logical unit with the required author format.
