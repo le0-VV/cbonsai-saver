@@ -20,6 +20,9 @@ class CbonsaiSaver < Formula
       Link it into your user screen saver folder:
         mkdir -p "$HOME/Library/Screen Savers"
         ln -sfn "#{opt_prefix}/Screen Savers/cbonsai saver.saver" "$HOME/Library/Screen Savers/cbonsai saver.saver"
+
+      For automatic user screen saver installation, use:
+        brew install --cask cbonsai-saver
     EOS
   end
 

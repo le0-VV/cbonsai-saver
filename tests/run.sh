@@ -35,6 +35,7 @@ BUILD_SOURCE_SCRIPT_PATH="scripts/build-cbonsai-source.sh"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
 CI_WORKFLOW_PATH=".github/workflows/ci.yml"
 FORMULA_PATH="Formula/cbonsai-saver.rb"
+CASK_PATH="Casks/cbonsai-saver.rb"
 HOMEBREW_DOC_PATH="HOMEBREW.md"
 LICENSE_PATH="LICENSE"
 SECURITY_PATH="SECURITY.md"
@@ -53,10 +54,18 @@ if [ ! -f "$FORMULA_PATH" ]; then
   exit 1
 fi
 
+if [ ! -f "$CASK_PATH" ]; then
+  echo "Missing Homebrew cask: $CASK_PATH" >&2
+  exit 1
+fi
+
 if [ ! -f "$HOMEBREW_DOC_PATH" ]; then
   echo "Missing Homebrew tap documentation: $HOMEBREW_DOC_PATH" >&2
   exit 1
 fi
+
+ruby -c "$FORMULA_PATH" >/dev/null
+ruby -c "$CASK_PATH" >/dev/null
 
 if [ ! -f "$LICENSE_PATH" ] || ! grep -Fq 'GNU GENERAL PUBLIC LICENSE' "$LICENSE_PATH"; then
   echo "Missing GPL license file." >&2
@@ -108,13 +117,23 @@ if grep -Fq 'GITHUB_ENV' "$CI_WORKFLOW_PATH"; then
   exit 1
 fi
 
-if ! grep -Fq 'releases/download/1.1/cbonsai-saver-1.1.zip' "$FORMULA_PATH"; then
-  echo "Homebrew formula should install the 1.1 release zip." >&2
+if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ruby -c Casks/cbonsai-saver.rb' "$CI_WORKFLOW_PATH"; then
+  echo "CI should check Homebrew cask syntax." >&2
   exit 1
 fi
 
-if grep -Fq 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$FORMULA_PATH"; then
-  echo "Homebrew formula SHA-256 must be set before release." >&2
+if ! grep -Fq 'releases/download/1.1/cbonsai-saver-1.1.zip' "$FORMULA_PATH" || ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
+  echo "Homebrew formula and cask should install the 1.1 release zip." >&2
+  exit 1
+fi
+
+if grep -Fq 'sha256 "0000000000000000000000000000000000000000000000000000000000000000"' "$FORMULA_PATH" "$CASK_PATH"; then
+  echo "Homebrew formula and cask SHA-256 must be set before release." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'sha256 "ae87070e2bdcff20caf766a95106a9f3585764b0738c6ff3ffc7bc342723978e"' "$FORMULA_PATH" || ! grep -Fq 'sha256 "ae87070e2bdcff20caf766a95106a9f3585764b0738c6ff3ffc7bc342723978e"' "$CASK_PATH"; then
+  echo "Homebrew formula and cask should use the 1.1 release SHA-256." >&2
   exit 1
 fi
 
@@ -130,6 +149,25 @@ do
     exit 1
   fi
 done
+
+for cask_text in \
+  'cask "cbonsai-saver" do' \
+  'version "1.1"' \
+  'depends_on arch: :arm64' \
+  'depends_on macos: :big_sur' \
+  'screen_saver "cbonsai saver.saver"' \
+  '~/Library/Screen Savers/cbonsai saver.saver'
+do
+  if ! grep -Fq "$cask_text" "$CASK_PATH"; then
+    echo "Missing Homebrew cask text: $cask_text" >&2
+    exit 1
+  fi
+done
+
+if ! grep -Fq 'brew install --cask cbonsai-saver' "$HOMEBREW_DOC_PATH" || ! grep -Fq 'brew install --cask cbonsai-saver' "$FORMULA_PATH"; then
+  echo "Homebrew docs and formula caveats should mention the automatic cask install." >&2
+  exit 1
+fi
 
 if ! grep -Fq '75cf844940e5ef825a74f2d5b1551fe81883551b600fecd00748c6aa325f5ab0' "$BUILD_SOURCE_SCRIPT_PATH"; then
   echo "Verified cbonsai source SHA-256 is missing." >&2
