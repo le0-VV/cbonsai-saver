@@ -1209,23 +1209,23 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     CGFloat y = 18.0;
     CGFloat labelX = 20.0;
-    CGFloat fieldX = 190.0;
+    CGFloat fieldX = 250.0;
     CGFloat helpButtonX = documentWidth - labelX - CBHelpButtonSize;
     CGFloat fieldWidth = helpButtonX - fieldX - CBHelpButtonGap;
     CGFloat compactHelpX = fieldX + 118.0;
 
     y = [self addSectionTitle:@"Timing" toView:documentView y:y];
-    NSTextField *timeLabel = [self addLabel:@"Growth time (--time)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *timeLabel = [self addLabel:@"Tree growth interval (--time)" toView:documentView frame:NSMakeRect(labelX, y, 220, 24)];
     self.timeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.timeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.01 max:60.0 increment:0.01];
-    [self setToolTip:@"Growth delay in seconds." forViews:@[timeLabel, self.timeField, self.timeStepper]];
+    [self setToolTip:@"Delay between growth steps." forViews:@[timeLabel, self.timeField, self.timeStepper]];
     [self addHelpButtonForAnchor:@"time" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    NSTextField *waitLabel = [self addLabel:@"Tree wait (--wait)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *waitLabel = [self addLabel:@"Growth restart wait time (--wait)" toView:documentView frame:NSMakeRect(labelX, y, 220, 24)];
     self.waitField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.waitStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:600.0 increment:0.25];
-    [self setToolTip:@"Delay after each tree." forViews:@[waitLabel, self.waitField, self.waitStepper]];
+    [self setToolTip:@"Delay before restarting growth." forViews:@[waitLabel, self.waitField, self.waitStepper]];
     [self addHelpButtonForAnchor:@"wait" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
 
@@ -1236,35 +1236,35 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self addHelpButtonForAnchor:@"message" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    self.baseEnabledButton = [self addCheckbox:@"Base (--base)" toView:documentView frame:NSMakeRect(labelX, y - 2, 160, 24)];
+    self.baseEnabledButton = [self addCheckbox:@"Pot style (--base)" toView:documentView frame:NSMakeRect(labelX, y - 2, 220, 24)];
     self.baseField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
-    [self setToolTip:@"Pass --base when enabled." forViews:@[self.baseEnabledButton, self.baseField]];
+    [self setToolTip:@"Styles 1 or 2, or use 0 for no pot." forViews:@[self.baseEnabledButton, self.baseField]];
     [self addHelpButtonForAnchor:@"base" toView:documentView frame:NSMakeRect(fieldX + 90.0, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    NSTextField *leafLabel = [self addLabel:@"Leaves (--leaf)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *leafLabel = [self addLabel:@"Leaf character (--leaf)" toView:documentView frame:NSMakeRect(labelX, y, 220, 24)];
     self.leafField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self setToolTip:@"Leaf character list." forViews:@[leafLabel, self.leafField]];
+    [self setToolTip:@"Character used for leaves." forViews:@[leafLabel, self.leafField]];
     [self addHelpButtonForAnchor:@"leaf" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    NSTextField *colorLabel = [self addLabel:@"Colors (--color)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *colorLabel = [self addLabel:@"Tree colour (--color)" toView:documentView frame:NSMakeRect(labelX, y, 220, 24)];
     self.colorField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, fieldWidth, 24)];
-    [self setToolTip:@"ANSI color list." forViews:@[colorLabel, self.colorField]];
+    [self setToolTip:@"ANSI colour indices." forViews:@[colorLabel, self.colorField]];
     [self addHelpButtonForAnchor:@"color" toView:documentView frame:NSMakeRect(helpButtonX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    NSTextField *multiplierLabel = [self addLabel:@"Multiplier (--multiplier)" toView:documentView frame:NSMakeRect(labelX, y, 170, 24)];
+    NSTextField *multiplierLabel = [self addLabel:@"Tree density (--multiplier)" toView:documentView frame:NSMakeRect(labelX, y, 220, 24)];
     self.multiplierField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.multiplierStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:20.0 increment:1.0];
     [self setToolTip:@"Branch density." forViews:@[multiplierLabel, self.multiplierField, self.multiplierStepper]];
     [self addHelpButtonForAnchor:@"multiplier" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 34.0;
 
-    NSTextField *lifeLabel = [self addLabel:@"Life (--life)" toView:documentView frame:NSMakeRect(labelX, y, 160, 24)];
+    NSTextField *lifeLabel = [self addLabel:@"Branch lifetime duration (--life)" toView:documentView frame:NSMakeRect(labelX, y, 220, 24)];
     self.lifeField = [self addTextFieldToView:documentView frame:NSMakeRect(fieldX, y - 2, 82, 24)];
     self.lifeStepper = [self addStepperToView:documentView frame:NSMakeRect(fieldX + 90, y - 4, 20, 28) min:0.0 max:200.0 increment:1.0];
-    [self setToolTip:@"Branch lifetime." forViews:@[lifeLabel, self.lifeField, self.lifeStepper]];
+    [self setToolTip:@"How long branches keep growing." forViews:@[lifeLabel, self.lifeField, self.lifeStepper]];
     [self addHelpButtonForAnchor:@"life" toView:documentView frame:NSMakeRect(compactHelpX, y, CBHelpButtonSize, CBHelpButtonSize)];
     y += 48.0;
 

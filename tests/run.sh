@@ -104,6 +104,26 @@ if grep -Fq 'id="font-size"' "$MANUAL_PATH"; then
   exit 1
 fi
 
+while IFS= read -r label
+do
+  if [ -z "$label" ]; then
+    continue
+  fi
+
+  if ! grep -Fq "$label" "$VIEW_PATH"; then
+    echo "Missing renamed setting label: $label" >&2
+    exit 1
+  fi
+done <<'EOF'
+Tree growth interval (--time)
+Growth restart wait time (--wait)
+Pot style (--base)
+Leaf character (--leaf)
+Tree colour (--color)
+Tree density (--multiplier)
+Branch lifetime duration (--life)
+EOF
+
 while IFS= read -r tooltip
 do
   if [ -z "$tooltip" ]; then
@@ -115,14 +135,14 @@ do
     exit 1
   fi
 done <<'EOF'
-Growth delay in seconds.
-Delay after each tree.
+Delay between growth steps.
+Delay before restarting growth.
 Text rendered with the tree.
-Pass --base when enabled.
-Leaf character list.
-ANSI color list.
+Styles 1 or 2, or use 0 for no pot.
+Character used for leaves.
+ANSI colour indices.
 Branch density.
-Branch lifetime.
+How long branches keep growing.
 Print final tree.
 Fixed random seed.
 Save tree state file.

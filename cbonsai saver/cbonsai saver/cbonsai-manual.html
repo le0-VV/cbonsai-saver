@@ -64,13 +64,13 @@
   <h2>Timing</h2>
 
   <section class="option" id="time">
-    <h3><code>--time=TIME</code></h3>
-    <p>Sets the delay used while the tree grows. Smaller values animate faster; larger values animate slower.</p>
+    <h3>Tree growth interval <code>--time=TIME</code></h3>
+    <p>Sets the delay between growth steps. Smaller values animate faster; larger values animate slower.</p>
   </section>
 
   <section class="option" id="wait">
-    <h3><code>--wait=TIME</code></h3>
-    <p>Sets how long to wait after a tree finishes before starting or exiting, depending on the selected mode.</p>
+    <h3>Growth restart wait time <code>--wait=TIME</code></h3>
+    <p>Sets how long to wait after a tree finishes before starting the next growth cycle.</p>
   </section>
 
   <h2>Tree</h2>
@@ -81,27 +81,27 @@
   </section>
 
   <section class="option" id="base">
-    <h3><code>--base=INT</code></h3>
-    <p>Sets the tree base style. The saver only passes this argument when the Base checkbox is enabled.</p>
+    <h3>Pot style <code>--base=INT</code></h3>
+    <p>Sets the pot style. Use 1 or 2, or enable this setting and use 0 for no pot.</p>
   </section>
 
   <section class="option" id="leaf">
-    <h3><code>--leaf=LIST</code></h3>
-    <p>Sets the character list used for leaves. The value is passed as a comma-separated list.</p>
+    <h3>Leaf character <code>--leaf=LIST</code></h3>
+    <p>Sets the character used for leaves. The value is passed through to cbonsai as the leaf list.</p>
   </section>
 
   <section class="option" id="color">
-    <h3><code>--color=LIST</code></h3>
-    <p>Sets the ANSI color list used for leaves. The value is passed as a comma-separated list.</p>
+    <h3>Tree colour <code>--color=LIST</code></h3>
+    <p>Sets ANSI colour indices for dark leaves, dark wood, light leaves, and light wood.</p>
   </section>
 
   <section class="option" id="multiplier">
-    <h3><code>--multiplier=INT</code></h3>
+    <h3>Tree density <code>--multiplier=INT</code></h3>
     <p>Controls branch density and growth scale. Larger values generally create fuller trees.</p>
   </section>
 
   <section class="option" id="life">
-    <h3><code>--life=INT</code></h3>
+    <h3>Branch lifetime duration <code>--life=INT</code></h3>
     <p>Controls how long branches continue growing. Larger values generally create taller or more complex trees.</p>
   </section>
 
