@@ -67,6 +67,11 @@ if grep -Fq 'Live (--live)' "$VIEW_PATH" || grep -Fq 'Infinite (--infinite)' "$V
   exit 1
 fi
 
+if grep -Eq 'add(Label|Checkbox):@"[^"]*\(--' "$VIEW_PATH"; then
+  echo "Visible setting labels should not expose command-line flags." >&2
+  exit 1
+fi
+
 if grep -Fq 'id="live"' "$MANUAL_PATH" || grep -Fq 'id="infinite"' "$MANUAL_PATH"; then
   echo "Live and infinite should not have setting manual anchors." >&2
   exit 1
@@ -115,13 +120,13 @@ do
     exit 1
   fi
 done <<'EOF'
-Tree growth interval (--time)
-Growth restart wait time (--wait)
-Pot style (--base)
-Leaf character (--leaf)
-Tree colour (--color)
-Tree density (--multiplier)
-Branch lifetime duration (--life)
+Tree growth interval (seconds)
+Growth restart wait time (seconds)
+Pot style
+Leaf character
+Tree colour (ANSI indices)
+Tree density
+Branch lifetime duration (steps)
 EOF
 
 while IFS= read -r tooltip
