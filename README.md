@@ -13,14 +13,6 @@ brew tap le0-VV/cbonsai-saver https://github.com/le0-VV/cbonsai-saver
 brew install cbonsai-saver
 ```
 
-The tap ships `cbonsai-saver` as a cask, so plain `brew install cbonsai-saver`
-installs the screen saver into `~/Library/Screen Savers`. The explicit cask form
-also works:
-
-```sh
-brew install --cask cbonsai-saver
-```
-
 See [HOMEBREW.md](HOMEBREW.md) for tap and release maintenance notes.
 
 ## License
