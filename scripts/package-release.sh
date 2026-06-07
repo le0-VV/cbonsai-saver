@@ -175,6 +175,7 @@ fi
 
 verify_release_binaries
 sign_screen_saver_bundle "$product"
+./scripts/verify-bundled-cbonsai-launch.sh "$product" "$release_arch"
 
 rm -rf "$staging_dir"
 mkdir -p "$staging_dir"

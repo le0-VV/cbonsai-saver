@@ -901,6 +901,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 @property (nonatomic) pid_t childProcessIdentifier;
 @property (nonatomic) BOOL stoppingChildProcess;
 @property (nonatomic) BOOL terminalDataFlushScheduled;
+@property (nonatomic) BOOL childProcessProducedOutput;
 @property (nonatomic, strong) NSWindow *configurationSheet;
 @property (nonatomic, strong) NSTextField *timeField;
 @property (nonatomic, strong) NSStepper *timeStepper;
@@ -1166,6 +1167,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
     if (childPid == 0) {
         execve(processArgv[0], processArgv, processEnvironment);
+        int execError = errno;
+        dprintf(STDERR_FILENO, "cbonsai exec failed: %s\n", strerror(execError));
         _exit(127);
     }
 
@@ -1176,6 +1179,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.masterFileDescriptor = masterFileDescriptor;
     self.childProcessIdentifier = childPid;
     self.stoppingChildProcess = NO;
+    self.childProcessProducedOutput = NO;
     [self startReadingFromPty:masterFileDescriptor childProcessIdentifier:childPid];
 }
 
@@ -1197,6 +1201,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     NSMutableArray<NSString *> *environment = [NSMutableArray arrayWithObjects:
         [@"PATH=" stringByAppendingString:CBDefaultEnvironmentPath()],
         @"TERM=xterm-256color",
+        @"TERMINFO_DIRS=/usr/share/terminfo",
         @"LANG=en_US.UTF-8",
         @"LC_ALL=en_US.UTF-8",
         nil];
@@ -1268,6 +1273,8 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         return;
     }
 
+    self.childProcessProducedOutput = YES;
+
     if (self.pendingTerminalData == nil) {
         self.pendingTerminalData = [NSMutableData data];
     }
@@ -1317,7 +1324,9 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     pid_t waitResult = waitpid(childProcessIdentifier, &status, WNOHANG);
 
     if (!self.stoppingChildProcess) {
-        [self.terminalBuffer showStatusMessage:CBStatusMessageForWaitResult(waitResult, status)];
+        if (!self.childProcessProducedOutput) {
+            [self.terminalBuffer showStatusMessage:CBStatusMessageForWaitResult(waitResult, status)];
+        }
         [self setNeedsDisplay:YES];
     }
 }
