@@ -27,6 +27,14 @@ static void CBAssertArgumentsWithAutomaticSeed(NSDictionary<NSString *, id> *opt
     CBAssert([actual isEqualToArray:expected], [NSString stringWithFormat:@"Compiled arguments %@, expected %@", actual, expected]);
 }
 
+static void CBAssertArgumentsExclude(NSDictionary<NSString *, id> *options, NSArray<NSString *> *excluded)
+{
+    NSArray<NSString *> *actual = CBCbonsaiArgumentsFromOptions(options);
+    for (NSString *argument in excluded) {
+        CBAssert(![actual containsObject:argument], [NSString stringWithFormat:@"Compiled arguments %@ should not include %@", actual, argument]);
+    }
+}
+
 int main(void)
 {
     @autoreleasepool {
@@ -39,7 +47,7 @@ int main(void)
             @"--wait=3",
             @"--base=1",
             @"--leaf=&",
-            @"--color=2,3,10,11",
+            @"--colors=2,3,10,11",
             @"--multiplier=5",
             @"--life=32",
         ]));
@@ -51,10 +59,17 @@ int main(void)
             @"--wait=3",
             @"--base=1",
             @"--leaf=&",
-            @"--color=2,3,10,11",
+            @"--colors=2,3,10,11",
             @"--multiplier=5",
             @"--life=32",
             @"--seed=4242",
+        ]));
+
+        CBAssertArgumentsExclude(@{
+            CBCbonsaiVerboseKey: @NO,
+        }, (@[
+            @"--verbose",
+            @"--color=2,3,10,11",
         ]));
 
         CBAssertArguments(@{
@@ -78,7 +93,7 @@ int main(void)
             @"--message=quiet bonsai",
             @"--base=0",
             @"--leaf=&,o,@",
-            @"--color=22,94,40,82",
+            @"--colors=22,94,40,82",
             @"--multiplier=13",
             @"--life=144",
             @"--seed=12345",
@@ -95,7 +110,7 @@ int main(void)
             @"--wait=3",
             @"--base=1",
             @"--leaf=&",
-            @"--color=2,3,10,11",
+            @"--colors=2,3,10,11",
             @"--multiplier=5",
             @"--life=32",
             @"--seed=12345",
@@ -111,7 +126,7 @@ int main(void)
             @"--wait=3",
             @"--base=1",
             @"--leaf=&",
-            @"--color=2,3,10,11",
+            @"--colors=2,3,10,11",
             @"--multiplier=5",
             @"--life=32",
         ]));
@@ -135,7 +150,7 @@ int main(void)
             @"--message=hi [31mthere",
             @"--base=2",
             @"--leaf=a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p",
-            @"--color=2,3,10,11",
+            @"--colors=2,3,10,11",
             @"--multiplier=1",
             @"--life=1",
         ]));

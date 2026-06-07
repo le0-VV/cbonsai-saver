@@ -72,7 +72,7 @@ if ! env -i \
     --wait=3 \
     --base=1 \
     "--leaf=&" \
-    --color=2,3,10,11 \
+    --colors=2,3,10,11 \
     --multiplier=5 \
     --life=32 >/dev/null
 then
