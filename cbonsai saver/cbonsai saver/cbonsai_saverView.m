@@ -233,6 +233,31 @@ static uint32_t CBDisplayIdentifierForScreen(NSScreen *screen)
     return [screenNumber respondsToSelector:@selector(unsignedIntValue)] ? [screenNumber unsignedIntValue] : 0;
 }
 
+static NSString *CBStatusMessageForWaitResult(pid_t waitResult, int status)
+{
+    if (waitResult < 0) {
+        return @"cbonsai exit status unavailable.";
+    }
+
+    if (waitResult == 0) {
+        return @"cbonsai PTY closed before process exit.";
+    }
+
+    if (WIFEXITED(status)) {
+        int exitStatus = WEXITSTATUS(status);
+        if (exitStatus == 0) {
+            return @"cbonsai exited.";
+        }
+        return [NSString stringWithFormat:@"cbonsai exited with status %d.", exitStatus];
+    }
+
+    if (WIFSIGNALED(status)) {
+        return [NSString stringWithFormat:@"cbonsai exited after signal %d.", WTERMSIG(status)];
+    }
+
+    return @"cbonsai exited.";
+}
+
 static NSInteger CBAutomaticCbonsaiSeedForScreen(NSScreen *screen)
 {
     uint32_t seed = arc4random();
@@ -1151,7 +1176,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.masterFileDescriptor = masterFileDescriptor;
     self.childProcessIdentifier = childPid;
     self.stoppingChildProcess = NO;
-    [self startReadingFromPty:masterFileDescriptor];
+    [self startReadingFromPty:masterFileDescriptor childProcessIdentifier:childPid];
 }
 
 - (char **)createProcessArgvWithExecutablePath:(NSString *)executablePath arguments:(NSArray<NSString *> *)arguments
@@ -1179,7 +1204,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     return CBCStringArrayFromStrings(environment);
 }
 
-- (void)startReadingFromPty:(int)fileDescriptor
+- (void)startReadingFromPty:(int)fileDescriptor childProcessIdentifier:(pid_t)childProcessIdentifier
 {
     dispatch_source_t source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)fileDescriptor, 0, self.readQueue);
     self.readSource = source;
@@ -1215,13 +1240,13 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
         if (availableData.length > 0) {
             NSData *data = availableData;
             dispatch_async(dispatch_get_main_queue(), ^{
-                [strongSelf enqueueTerminalData:data];
+                [strongSelf enqueueTerminalData:data fromFileDescriptor:fileDescriptor childProcessIdentifier:childProcessIdentifier];
             });
         }
 
         if (shouldHandleExit) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                [strongSelf handleChildProcessExit];
+                [strongSelf handleChildProcessExitForFileDescriptor:fileDescriptor childProcessIdentifier:childProcessIdentifier];
             });
         }
     });
@@ -1233,9 +1258,13 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     dispatch_resume(source);
 }
 
-- (void)enqueueTerminalData:(NSData *)data
+- (void)enqueueTerminalData:(NSData *)data fromFileDescriptor:(int)fileDescriptor childProcessIdentifier:(pid_t)childProcessIdentifier
 {
     if (data.length == 0) {
+        return;
+    }
+
+    if (fileDescriptor != self.masterFileDescriptor || childProcessIdentifier != self.childProcessIdentifier) {
         return;
     }
 
@@ -1267,8 +1296,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self setNeedsDisplay:YES];
 }
 
-- (void)handleChildProcessExit
+- (void)handleChildProcessExitForFileDescriptor:(int)fileDescriptor childProcessIdentifier:(pid_t)childProcessIdentifier
 {
+    if (fileDescriptor != self.masterFileDescriptor || childProcessIdentifier != self.childProcessIdentifier) {
+        int staleStatus = 0;
+        waitpid(childProcessIdentifier, &staleStatus, WNOHANG);
+        return;
+    }
+
     [self flushPendingTerminalDataAndDisplay];
 
     if (self.readSource != nil) {
@@ -1277,15 +1312,12 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
     self.masterFileDescriptor = -1;
 
-    pid_t childPid = self.childProcessIdentifier;
     self.childProcessIdentifier = -1;
-    if (childPid > 0) {
-        int status = 0;
-        waitpid(childPid, &status, WNOHANG);
-    }
+    int status = 0;
+    pid_t waitResult = waitpid(childProcessIdentifier, &status, WNOHANG);
 
     if (!self.stoppingChildProcess) {
-        [self.terminalBuffer showStatusMessage:@"cbonsai exited."];
+        [self.terminalBuffer showStatusMessage:CBStatusMessageForWaitResult(waitResult, status)];
         [self setNeedsDisplay:YES];
     }
 }

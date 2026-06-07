@@ -387,6 +387,25 @@ if ! grep -Fq 'NSData *data = availableData;' "$VIEW_PATH" || ! grep -Fq 'self.p
   exit 1
 fi
 
+for pty_identity_text in \
+  'startReadingFromPty:(int)fileDescriptor childProcessIdentifier:(pid_t)childProcessIdentifier' \
+  'enqueueTerminalData:data fromFileDescriptor:fileDescriptor childProcessIdentifier:childProcessIdentifier' \
+  'handleChildProcessExitForFileDescriptor:fileDescriptor childProcessIdentifier:childProcessIdentifier' \
+  'fileDescriptor != self.masterFileDescriptor || childProcessIdentifier != self.childProcessIdentifier' \
+  'CBStatusMessageForWaitResult(waitResult, status)' \
+  'cbonsai exited with status %d.'
+do
+  if ! grep -Fq "$pty_identity_text" "$VIEW_PATH"; then
+    echo "PTY callbacks should be scoped to the cbonsai process that produced them: $pty_identity_text" >&2
+    exit 1
+  fi
+done
+
+if grep -Fq '[strongSelf handleChildProcessExit];' "$VIEW_PATH" || grep -Fq '[strongSelf enqueueTerminalData:data];' "$VIEW_PATH"; then
+  echo "PTY callbacks should not update the current terminal without process identity checks." >&2
+  exit 1
+fi
+
 if grep -Fq 'CBCbonsaiScreensaverKey' "cbonsai saver/cbonsai saver/CBCommandLine."* "$VIEW_PATH"; then
   echo "Screensaver mode should not be exposed." >&2
   exit 1
