@@ -221,6 +221,7 @@ for ncurses_source_text in \
   'LDFLAGS="-arch $release_arch -mmacosx-version-min=$deployment_target ${LDFLAGS:-}"' \
   '--with-pkg-config-libdir="${prefix}/lib/pkgconfig"' \
   '--without-cxx-binding' \
+  ') >&2' \
   'verify_macho_file "$dylib"'
 do
   if ! grep -Fq -- "$ncurses_source_text" "$BUILD_NCURSES_SCRIPT_PATH"; then

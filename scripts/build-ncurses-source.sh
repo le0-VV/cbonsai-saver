@@ -146,7 +146,7 @@ export LDFLAGS="-arch $release_arch -mmacosx-version-min=$deployment_target ${LD
     --without-cxx-binding
   make -j"$make_jobs"
   make install
-)
+) >&2
 
 for dylib in \
   "${prefix}/lib/libncursesw.6.dylib" \
