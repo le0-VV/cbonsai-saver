@@ -171,7 +171,7 @@ NSArray<NSString *> *CBCbonsaiArgumentsFromOptionsWithAutomaticSeed(NSDictionary
     }
 
     [arguments addObject:[@"--leaf=" stringByAppendingString:CBSanitizedLeafOption(CBStringOption(mergedOptions, CBCbonsaiLeafKey))]];
-    [arguments addObject:[@"--color=" stringByAppendingString:CBSanitizedColorOption(CBStringOption(mergedOptions, CBCbonsaiColorKey))]];
+    [arguments addObject:[@"--colors=" stringByAppendingString:CBSanitizedColorOption(CBStringOption(mergedOptions, CBCbonsaiColorKey))]];
     [arguments addObject:[NSString stringWithFormat:@"--multiplier=%ld", (long)CBClampedIntegerOption(mergedOptions, CBCbonsaiMultiplierKey, 5, 1, 20)]];
     [arguments addObject:[NSString stringWithFormat:@"--life=%ld", (long)CBClampedIntegerOption(mergedOptions, CBCbonsaiLifeKey, 32, 1, 200)]];
 
