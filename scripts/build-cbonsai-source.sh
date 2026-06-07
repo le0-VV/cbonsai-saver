@@ -4,30 +4,78 @@ set -eu
 PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PATH
 
-PKG_CONFIG_PATH=""
-for pkg_config_dir in /opt/homebrew/opt/ncurses/lib/pkgconfig /usr/local/opt/ncurses/lib/pkgconfig
-do
-  if [ -d "$pkg_config_dir" ]; then
-    if [ -n "$PKG_CONFIG_PATH" ]; then
-      PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$pkg_config_dir"
-    else
-      PKG_CONFIG_PATH="$pkg_config_dir"
-    fi
-  fi
-done
-export PKG_CONFIG_PATH
-
 cd "$(dirname "$0")/.."
+
+release_arch="${1:-$(uname -m)}"
+case "$release_arch" in
+  arm64|x86_64)
+    ;;
+  *)
+    echo "Unsupported cbonsai release architecture: $release_arch" >&2
+    exit 1
+    ;;
+esac
 
 version="1.4.2"
 archive_sha256="75cf844940e5ef825a74f2d5b1551fe81883551b600fecd00748c6aa325f5ab0"
 url="https://gitlab.com/jallbrit/cbonsai/-/archive/v${version}/cbonsai-v${version}.tar.gz"
-build_root="build/upstream"
-archive="${build_root}/cbonsai-v${version}.tar.gz"
+archive_root="build/upstream"
+build_root="${archive_root}/${release_arch}"
+archive="${archive_root}/cbonsai-v${version}.tar.gz"
 source_dir="${build_root}/cbonsai-v${version}"
 binary="${source_dir}/cbonsai"
 
-mkdir -p "$build_root"
+library_supports_arch()
+{
+  if [ ! -f "$1" ]; then
+    return 1
+  fi
+
+  lipo -archs "$1" 2>/dev/null | tr ' ' '\n' | grep -Fx "$release_arch" >/dev/null
+}
+
+add_pkg_config_dir()
+{
+  pkg_config_dir="$1"
+  if [ ! -d "$pkg_config_dir" ]; then
+    return
+  fi
+
+  libdir="$(PKG_CONFIG_PATH="$pkg_config_dir" pkg-config --variable=libdir ncursesw 2>/dev/null || true)"
+  if [ -z "$libdir" ]; then
+    return
+  fi
+
+  if ! library_supports_arch "${libdir}/libncursesw.6.dylib" || ! library_supports_arch "${libdir}/libpanelw.6.dylib"; then
+    return
+  fi
+
+  if [ -n "$PKG_CONFIG_PATH" ]; then
+    PKG_CONFIG_PATH="${PKG_CONFIG_PATH}:$pkg_config_dir"
+  else
+    PKG_CONFIG_PATH="$pkg_config_dir"
+  fi
+}
+
+PKG_CONFIG_PATH=""
+case "$release_arch" in
+  arm64)
+    add_pkg_config_dir /opt/homebrew/opt/ncurses/lib/pkgconfig
+    add_pkg_config_dir /usr/local/opt/ncurses/lib/pkgconfig
+    ;;
+  x86_64)
+    add_pkg_config_dir /usr/local/opt/ncurses/lib/pkgconfig
+    add_pkg_config_dir /opt/homebrew/opt/ncurses/lib/pkgconfig
+    ;;
+esac
+export PKG_CONFIG_PATH
+
+if [ -z "$PKG_CONFIG_PATH" ]; then
+  echo "Unable to find $release_arch Homebrew ncurses pkg-config metadata." >&2
+  exit 1
+fi
+
+mkdir -p "$archive_root" "$build_root"
 
 if [ ! -f "$archive" ]; then
   temporary_archive="${archive}.$$"
@@ -67,10 +115,17 @@ if [ ! -d "$source_dir" ]; then
   exit 1
 fi
 
-make -C "$source_dir" WITH_BASH=0 cbonsai >&2
+compiler="${CC:-cc}"
+make -C "$source_dir" WITH_BASH=0 CC="$compiler -arch $release_arch" cbonsai >&2
 
 if [ ! -x "$binary" ]; then
   echo "Expected built cbonsai binary at $binary" >&2
+  exit 1
+fi
+
+actual_archs="$(lipo -archs "$binary" 2>/dev/null || true)"
+if [ "$actual_archs" != "$release_arch" ]; then
+  echo "Built cbonsai has architecture '$actual_archs', expected '$release_arch'." >&2
   exit 1
 fi
 

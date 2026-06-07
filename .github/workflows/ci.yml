@@ -30,8 +30,18 @@ jobs:
         run: ruby -c Casks/cbonsai-saver.rb
 
   build:
-    name: Release build
-    runs-on: macos-15
+    name: Release build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+            artifact: cbonsai-saver-1.1.1.zip
+          - arch: x86_64
+            runner: macos-15-intel
+            artifact: cbonsai-saver-1.1.1-x86_64.zip
     steps:
       - name: Check out repository
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
@@ -40,7 +50,7 @@ jobs:
         run: brew install ncurses pkgconf
 
       - name: Build release archive
-        run: ./scripts/package-release.sh 1.1.1
+        run: ./scripts/package-release.sh 1.1.1 "${{ matrix.arch }}"
 
       - name: Show release archive checksum
-        run: shasum -a 256 build/release/artifacts/cbonsai-saver-1.1.1.zip
+        run: shasum -a 256 "build/release/artifacts/${{ matrix.artifact }}"
