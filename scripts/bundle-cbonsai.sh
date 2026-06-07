@@ -17,7 +17,7 @@ repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 is_trusted_cbonsai_source()
 {
   case "$1" in
-    "${repo_root}"/build/upstream/cbonsai-v1.4.2/cbonsai|/opt/homebrew/bin/cbonsai|/opt/homebrew/opt/cbonsai/bin/cbonsai|/opt/homebrew/Cellar/cbonsai/*/bin/cbonsai|/usr/local/bin/cbonsai|/usr/local/opt/cbonsai/bin/cbonsai|/usr/local/Cellar/cbonsai/*/bin/cbonsai)
+    "${repo_root}"/build/upstream/*/cbonsai-v1.4.2/cbonsai|/opt/homebrew/bin/cbonsai|/opt/homebrew/opt/cbonsai/bin/cbonsai|/opt/homebrew/Cellar/cbonsai/*/bin/cbonsai|/usr/local/bin/cbonsai|/usr/local/opt/cbonsai/bin/cbonsai|/usr/local/Cellar/cbonsai/*/bin/cbonsai)
       return 0
       ;;
     *)
@@ -84,7 +84,7 @@ is_bundled_dependency()
 is_trusted_dependency()
 {
   case "$1" in
-    /opt/homebrew/opt/*|/opt/homebrew/Cellar/*|/usr/local/opt/*|/usr/local/Cellar/*|"${repo_root}"/build/upstream/*)
+    /opt/homebrew/opt/*|/opt/homebrew/Cellar/*|/usr/local/opt/*|/usr/local/Cellar/*|"${repo_root}"/build/upstream/*|"${repo_root}"/build/release/deps/ncurses/*)
       return 0
       ;;
     *)

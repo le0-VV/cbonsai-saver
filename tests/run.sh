@@ -32,10 +32,12 @@ COMMAND_LINE_PATH="cbonsai saver/cbonsai saver/CBCommandLine.m"
 PROJECT_PATH="cbonsai saver/cbonsai saver.xcodeproj/project.pbxproj"
 BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
 BUILD_SOURCE_SCRIPT_PATH="scripts/build-cbonsai-source.sh"
+BUILD_NCURSES_SCRIPT_PATH="scripts/build-ncurses-source.sh"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
 CI_WORKFLOW_PATH=".github/workflows/ci.yml"
 CASK_PATH="Casks/cbonsai-saver.rb"
 HOMEBREW_DOC_PATH="HOMEBREW.md"
+README_PATH="README.md"
 LICENSE_PATH="LICENSE"
 SECURITY_PATH="SECURITY.md"
 THIRD_PARTY_NOTICES_PATH="THIRD_PARTY_NOTICES.md"
@@ -46,6 +48,7 @@ fi
 
 sh -n "$BUNDLE_SCRIPT_PATH"
 sh -n "$BUILD_SOURCE_SCRIPT_PATH"
+sh -n "$BUILD_NCURSES_SCRIPT_PATH"
 sh -n "$RELEASE_SCRIPT_PATH"
 
 if [ ! -f "$CASK_PATH" ]; then
@@ -55,6 +58,11 @@ fi
 
 if [ ! -f "$HOMEBREW_DOC_PATH" ]; then
   echo "Missing Homebrew tap documentation: $HOMEBREW_DOC_PATH" >&2
+  exit 1
+fi
+
+if [ ! -f "$README_PATH" ]; then
+  echo "Missing README: $README_PATH" >&2
   exit 1
 fi
 
@@ -105,6 +113,11 @@ if ! grep -Fq 'runs-on: macos-15' "$CI_WORKFLOW_PATH"; then
   exit 1
 fi
 
+if ! grep -Fq 'runner: macos-15-intel' "$CI_WORKFLOW_PATH"; then
+  echo "GitHub Actions should build the manual x86_64 release on the pinned Intel runner." >&2
+  exit 1
+fi
+
 if grep -Fq 'brew install cbonsai' "$CI_WORKFLOW_PATH"; then
   echo "CI release builds should not install a Homebrew cbonsai binary." >&2
   exit 1
@@ -125,13 +138,18 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq './scripts/package-release.sh 1.1.1' "$CI_WORKFLOW_PATH" || ! grep -Fq 'build/release/artifacts/cbonsai-saver-1.1.1.zip' "$CI_WORKFLOW_PATH"; then
-  echo "CI release build should package the current release version." >&2
+if ! grep -Fq './scripts/package-release.sh 1.1.2x "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2x.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
+  echo "CI release build should package the current release version for arm64 and x86_64." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'brew_packages: ncurses pkgconf' "$CI_WORKFLOW_PATH" || ! grep -Fq 'brew_packages: pkgconf' "$CI_WORKFLOW_PATH"; then
+  echo "CI should install Homebrew ncurses only for the arm64 cask artifact." >&2
   exit 1
 fi
 
 if ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
-  echo "Homebrew cask should install the 1.1.1 release zip." >&2
+  echo "Homebrew cask should install the 1.1.2x release zip." >&2
   exit 1
 fi
 
@@ -140,14 +158,14 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.1 release SHA-256." >&2
+if ! grep -Fq 'sha256 "ef382f1134dba0c43286e294bd9bf1ddb728485f5d7e5af7349014b5ecb01e3d"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.2x release SHA-256." >&2
   exit 1
 fi
 
 for cask_text in \
   'cask "cbonsai-saver" do' \
-  'version "1.1.1"' \
+  'version "1.1.2x"' \
   'depends_on arch: :arm64' \
   'depends_on macos: :big_sur' \
   'screen_saver "cbonsai saver.saver"' \
@@ -171,18 +189,64 @@ if ! grep -Fq 'xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbons
   exit 1
 fi
 
+for intel_release_doc_text in \
+  'The cask is Apple Silicon only' \
+  'cbonsai-saver-<version>-x86_64-macos10.15.zip' \
+  './scripts/package-release.sh 1.1.2x arm64' \
+  './scripts/package-release.sh 1.1.2x x86_64' \
+  'build/release/artifacts/cbonsai-saver-1.1.2x-x86_64-macos10.15.zip'
+do
+  if ! grep -Fq "$intel_release_doc_text" "$HOMEBREW_DOC_PATH" "$README_PATH"; then
+    echo "Missing Intel release documentation: $intel_release_doc_text" >&2
+    exit 1
+  fi
+done
+
 if ! grep -Fq '75cf844940e5ef825a74f2d5b1551fe81883551b600fecd00748c6aa325f5ab0' "$BUILD_SOURCE_SCRIPT_PATH"; then
   echo "Verified cbonsai source SHA-256 is missing." >&2
   exit 1
 fi
 
+for ncurses_source_text in \
+  'version="6.6"' \
+  'archive_sha256="355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11"' \
+  'url="https://ftpmirror.gnu.org/gnu/ncurses/ncurses-${version}.tar.gz"' \
+  'prefix="$(pwd)/build/release/deps/ncurses/${release_arch}-macos${deployment_target}"' \
+  'Source-built ncurses is only supported for x86_64 releases.' \
+  'ncurses source archive contains unexpected paths.' \
+  'ncurses source archive contains unsafe paths.' \
+  'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
+  'CC="$compiler -arch $release_arch"' \
+  'CFLAGS="-mmacosx-version-min=$deployment_target ${CFLAGS:-}"' \
+  'LDFLAGS="-arch $release_arch -mmacosx-version-min=$deployment_target ${LDFLAGS:-}"' \
+  '--with-pkg-config-libdir="${prefix}/lib/pkgconfig"' \
+  '--without-cxx-binding' \
+  ') >&2' \
+  'verify_macho_file "$dylib"'
+do
+  if ! grep -Fq -- "$ncurses_source_text" "$BUILD_NCURSES_SCRIPT_PATH"; then
+    echo "Missing ncurses source-build hardening text: $ncurses_source_text" >&2
+    exit 1
+  fi
+done
+
 for source_hardening_text in \
   'PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"' \
+  'release_arch="${1:-$(uname -m)}"' \
+  'deployment_target="${2:-}"' \
+  'release_profile="${release_profile}-macos${deployment_target}"' \
   'PKG_CONFIG_PATH=""' \
-  '/opt/homebrew/opt/ncurses/lib/pkgconfig' \
+  'CBONSAI_NCURSES_PKG_CONFIG_PATH' \
+  'build/release/deps/ncurses/*/lib/pkgconfig' \
+  'Unsupported cbonsai ncurses pkg-config path' \
+  'Unable to find $release_arch ncurses pkg-config metadata for deployment target' \
+  'x86_64 macOS 10.15 releases must use source-built ncurses.' \
   'cbonsai source archive contains unexpected paths.' \
   'cbonsai source archive contains unsafe paths.' \
-  'make -C "$source_dir" WITH_BASH=0 cbonsai'
+  'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
+  'CC="$compiler -arch $release_arch"' \
+  'Built cbonsai has minimum macOS' \
+  'lipo -archs "$binary"'
 do
   if ! grep -Fq "$source_hardening_text" "$BUILD_SOURCE_SCRIPT_PATH"; then
     echo "Missing verified-source hardening text: $source_hardening_text" >&2
@@ -191,6 +255,8 @@ do
 done
 
 for bundle_hardening_text in \
+  'build/upstream/*/cbonsai-v1.4.2/cbonsai' \
+  'build/release/deps/ncurses/*' \
   'Refusing to bundle cbonsai from a non-absolute path' \
   'Refusing to bundle cbonsai from an unsupported location' \
   'Refusing to bundle unexpected cbonsai binary name' \
@@ -205,8 +271,19 @@ done
 
 for release_hardening_text in \
   'Invalid release version' \
-  'CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh)"' \
+  'Unsupported release architecture' \
+  'release_profile="x86_64-macos${deployment_target}"' \
+  'archive_name="cbonsai-saver-${version}-${release_profile}.zip"' \
+  'NCURSES_PREFIX="$(./scripts/build-ncurses-source.sh "$release_arch" "$deployment_target")"' \
+  'CBONSAI_NCURSES_PKG_CONFIG_PATH="${NCURSES_PREFIX}/lib/pkgconfig"' \
+  'CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh "$release_arch" "$deployment_target")"' \
   'Unexpected verified cbonsai binary path' \
+  'verify_macho_architecture' \
+  'verify_macho_deployment_target' \
+  'platform=macOS,arch=${release_arch}' \
+  'ARCHS="$release_arch"' \
+  'ONLY_ACTIVE_ARCH=YES' \
+  'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
   'codesign --force --deep --sign - --timestamp=none "$1"' \
   'codesign --verify --deep --strict --verbose=4 "$1"'
 do

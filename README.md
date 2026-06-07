@@ -13,6 +13,15 @@ brew tap le0-VV/cbonsai-saver https://github.com/le0-VV/cbonsai-saver
 brew install cbonsai-saver
 ```
 
+The Homebrew cask is Apple Silicon only. Intel Mac users should download the
+`cbonsai-saver-<version>-x86_64-macos10.15.zip` archive from the GitHub release
+page and install `cbonsai saver.saver` manually into `~/Library/Screen Savers`.
+If macOS blocks the manual install, remove quarantine from the installed bundle:
+
+```sh
+xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbonsai saver.saver"
+```
+
 See [HOMEBREW.md](HOMEBREW.md) for tap and release maintenance notes.
 
 ## License
