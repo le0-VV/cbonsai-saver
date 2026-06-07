@@ -84,7 +84,7 @@ is_bundled_dependency()
 is_trusted_dependency()
 {
   case "$1" in
-    /opt/homebrew/opt/*|/opt/homebrew/Cellar/*|/usr/local/opt/*|/usr/local/Cellar/*|"${repo_root}"/build/upstream/*)
+    /opt/homebrew/opt/*|/opt/homebrew/Cellar/*|/usr/local/opt/*|/usr/local/Cellar/*|"${repo_root}"/build/upstream/*|"${repo_root}"/build/release/deps/ncurses/*)
       return 0
       ;;
     *)

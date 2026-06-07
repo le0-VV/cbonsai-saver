@@ -39,15 +39,17 @@ jobs:
           - arch: arm64
             runner: macos-15
             artifact: cbonsai-saver-1.1.1.zip
+            brew_packages: ncurses pkgconf
           - arch: x86_64
             runner: macos-15-intel
-            artifact: cbonsai-saver-1.1.1-x86_64.zip
+            artifact: cbonsai-saver-1.1.1-x86_64-macos10.15.zip
+            brew_packages: pkgconf
     steps:
       - name: Check out repository
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
 
       - name: Install build dependencies
-        run: brew install ncurses pkgconf
+        run: brew install ${{ matrix.brew_packages }}
 
       - name: Build release archive
         run: ./scripts/package-release.sh 1.1.1 "${{ matrix.arch }}"

@@ -20,9 +20,11 @@ from the pinned upstream source archive verified by
 
 ## ncurses
 
-Release builds may also bundle Homebrew `ncurses` runtime libraries required by
-the bundled `cbonsai` executable.
+Release builds may also bundle `ncurses` runtime libraries required by the
+bundled `cbonsai` executable. Apple Silicon Homebrew release builds use
+Homebrew `ncurses`; Intel macOS 10.15 release builds compile `ncurses` from the
+pinned upstream source archive verified by `scripts/build-ncurses-source.sh`.
 
 - Project: https://invisible-island.net/ncurses/
 - License: `X11-distribute-modifications-variant`
-- Packaging reference: Homebrew `ncurses` formula
+- Packaging reference: Homebrew `ncurses` formula and upstream source archive
