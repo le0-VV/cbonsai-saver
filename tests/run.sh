@@ -138,7 +138,7 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq './scripts/package-release.sh 1.1.2x "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2x.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
+if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.2' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.2x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
   echo "CI release build should package the current release version for arm64 and x86_64." >&2
   exit 1
 fi
@@ -149,7 +149,7 @@ if ! grep -Fq 'brew_packages: ncurses pkgconf' "$CI_WORKFLOW_PATH" || ! grep -Fq
 fi
 
 if ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
-  echo "Homebrew cask should install the 1.1.2x release zip." >&2
+  echo "Homebrew cask should install the 1.1.2 release zip." >&2
   exit 1
 fi
 
@@ -158,14 +158,14 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "ef382f1134dba0c43286e294bd9bf1ddb728485f5d7e5af7349014b5ecb01e3d"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.2x release SHA-256." >&2
+if ! grep -Fq 'sha256 "6f3bf630d78abfd26faa6e029db4987c1aa4546076f725d42c2804116fc8eb1d"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.2 release SHA-256." >&2
   exit 1
 fi
 
 for cask_text in \
   'cask "cbonsai-saver" do' \
-  'version "1.1.2x"' \
+  'version "1.1.2"' \
   'depends_on arch: :arm64' \
   'depends_on macos: :big_sur' \
   'screen_saver "cbonsai saver.saver"' \
@@ -192,9 +192,10 @@ fi
 for intel_release_doc_text in \
   'The cask is Apple Silicon only' \
   'cbonsai-saver-<version>-x86_64-macos10.15.zip' \
-  './scripts/package-release.sh 1.1.2x arm64' \
+  './scripts/package-release.sh 1.1.2 arm64' \
   './scripts/package-release.sh 1.1.2x x86_64' \
-  'build/release/artifacts/cbonsai-saver-1.1.2x-x86_64-macos10.15.zip'
+  'build/release/artifacts/cbonsai-saver-1.1.2x-x86_64-macos10.15.zip' \
+  'The `x` suffix is only for the manual Intel release version.'
 do
   if ! grep -Fq "$intel_release_doc_text" "$HOMEBREW_DOC_PATH" "$README_PATH"; then
     echo "Missing Intel release documentation: $intel_release_doc_text" >&2
