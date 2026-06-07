@@ -136,6 +136,7 @@ export LDFLAGS="-arch $release_arch -mmacosx-version-min=$deployment_target ${LD
     --prefix="$prefix" \
     --enable-pc-files \
     --with-pkg-config-libdir="${prefix}/lib/pkgconfig" \
+    --with-terminfo-dirs=/usr/share/terminfo \
     --enable-sigwinch \
     --enable-symlinks \
     --enable-widec \

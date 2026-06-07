@@ -34,6 +34,7 @@ BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
 BUILD_SOURCE_SCRIPT_PATH="scripts/build-cbonsai-source.sh"
 BUILD_NCURSES_SCRIPT_PATH="scripts/build-ncurses-source.sh"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
+LAUNCH_VERIFY_SCRIPT_PATH="scripts/verify-bundled-cbonsai-launch.sh"
 CI_WORKFLOW_PATH=".github/workflows/ci.yml"
 CASK_PATH="Casks/cbonsai-saver.rb"
 HOMEBREW_DOC_PATH="HOMEBREW.md"
@@ -50,6 +51,7 @@ sh -n "$BUNDLE_SCRIPT_PATH"
 sh -n "$BUILD_SOURCE_SCRIPT_PATH"
 sh -n "$BUILD_NCURSES_SCRIPT_PATH"
 sh -n "$RELEASE_SCRIPT_PATH"
+sh -n "$LAUNCH_VERIFY_SCRIPT_PATH"
 
 if [ ! -f "$CASK_PATH" ]; then
   echo "Missing Homebrew cask: $CASK_PATH" >&2
@@ -221,6 +223,7 @@ for ncurses_source_text in \
   'CFLAGS="-mmacosx-version-min=$deployment_target ${CFLAGS:-}"' \
   'LDFLAGS="-arch $release_arch -mmacosx-version-min=$deployment_target ${LDFLAGS:-}"' \
   '--with-pkg-config-libdir="${prefix}/lib/pkgconfig"' \
+  '--with-terminfo-dirs=/usr/share/terminfo' \
   '--without-cxx-binding' \
   ') >&2' \
   'verify_macho_file "$dylib"'
@@ -286,10 +289,25 @@ for release_hardening_text in \
   'ONLY_ACTIVE_ARCH=YES' \
   'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
   'codesign --force --deep --sign - --timestamp=none "$1"' \
-  'codesign --verify --deep --strict --verbose=4 "$1"'
+  'codesign --verify --deep --strict --verbose=4 "$1"' \
+  './scripts/verify-bundled-cbonsai-launch.sh "$product" "$release_arch"'
 do
   if ! grep -Fq "$release_hardening_text" "$RELEASE_SCRIPT_PATH"; then
     echo "Missing release hardening text: $release_hardening_text" >&2
+    exit 1
+  fi
+done
+
+for launch_verify_text in \
+  '/usr/bin/script -q "$typescript" /bin/sh -c "$launcher"' \
+  'cbonsai did not stay alive under PTY long enough to verify launch.' \
+  'lipo -archs "$binary"' \
+  'codesign --verify --strict --verbose=4 "$binary"' \
+  'TERM=xterm-256color' \
+  'TERMINFO_DIRS=/usr/share/terminfo'
+do
+  if ! grep -Fq "$launch_verify_text" "$LAUNCH_VERIFY_SCRIPT_PATH"; then
+    echo "Missing bundled cbonsai launch verification text: $launch_verify_text" >&2
     exit 1
   fi
 done
@@ -392,6 +410,10 @@ for pty_identity_text in \
   'enqueueTerminalData:data fromFileDescriptor:fileDescriptor childProcessIdentifier:childProcessIdentifier' \
   'handleChildProcessExitForFileDescriptor:fileDescriptor childProcessIdentifier:childProcessIdentifier' \
   'fileDescriptor != self.masterFileDescriptor || childProcessIdentifier != self.childProcessIdentifier' \
+  'dprintf(STDERR_FILENO, "cbonsai exec failed: %s\n", strerror(execError));' \
+  '@"TERMINFO_DIRS=/usr/share/terminfo"' \
+  'self.childProcessProducedOutput = YES;' \
+  'if (!self.childProcessProducedOutput)' \
   'CBStatusMessageForWaitResult(waitResult, status)' \
   'cbonsai exited with status %d.'
 do
