@@ -38,11 +38,11 @@ jobs:
         include:
           - arch: arm64
             runner: macos-15
-            artifact: cbonsai-saver-1.1.1.zip
+            artifact: cbonsai-saver-1.1.2x.zip
             brew_packages: ncurses pkgconf
           - arch: x86_64
             runner: macos-15-intel
-            artifact: cbonsai-saver-1.1.1-x86_64-macos10.15.zip
+            artifact: cbonsai-saver-1.1.2x-x86_64-macos10.15.zip
             brew_packages: pkgconf
     steps:
       - name: Check out repository
@@ -52,7 +52,7 @@ jobs:
         run: brew install ${{ matrix.brew_packages }}
 
       - name: Build release archive
-        run: ./scripts/package-release.sh 1.1.1 "${{ matrix.arch }}"
+        run: ./scripts/package-release.sh 1.1.2x "${{ matrix.arch }}"
 
       - name: Show release archive checksum
         run: shasum -a 256 "build/release/artifacts/${{ matrix.artifact }}"

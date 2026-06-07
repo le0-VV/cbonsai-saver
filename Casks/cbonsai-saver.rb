@@ -1,6 +1,6 @@
 cask "cbonsai-saver" do
-  version "1.1.1"
-  sha256 "13bd552fc287207134a5858c7fd89798f53f50da531afbdc58797adf7502d38c"
+  version "1.1.2x"
+  sha256 "ef382f1134dba0c43286e294bd9bf1ddb728485f5d7e5af7349014b5ecb01e3d"
 
   url "https://github.com/le0-VV/cbonsai-saver/releases/download/#{version}/cbonsai-saver-#{version}.zip",
       verified: "github.com/le0-VV/cbonsai-saver/"
