@@ -38,6 +38,7 @@ build_root="${archive_root}/${release_profile}"
 archive="${archive_root}/cbonsai-v${version}.tar.gz"
 source_dir="${build_root}/cbonsai-v${version}"
 binary="${source_dir}/cbonsai"
+cbonsai_patch="patches/cbonsai-v1.4.2-saver-noninteractive.patch"
 
 library_supports_arch()
 {
@@ -198,8 +199,15 @@ if [ ! -d "$source_dir" ]; then
   exit 1
 fi
 
+if [ ! -f "$cbonsai_patch" ]; then
+  echo "Missing cbonsai saver patch: $cbonsai_patch" >&2
+  exit 1
+fi
+
+patch -d "$source_dir" -p1 < "$cbonsai_patch" >&2
+
 compiler="${CC:-cc}"
-build_cflags="${CFLAGS:-}"
+build_cflags="-DCBONSAI_SAVER_NONINTERACTIVE=1 ${CFLAGS:-}"
 build_ldflags="${LDFLAGS:-}"
 if [ -n "$deployment_target" ]; then
   export MACOSX_DEPLOYMENT_TARGET="$deployment_target"

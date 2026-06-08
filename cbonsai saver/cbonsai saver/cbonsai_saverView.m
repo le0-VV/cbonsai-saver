@@ -369,6 +369,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 - (CBTerminalCell)cellAtColumn:(NSUInteger)column row:(NSUInteger)row;
 - (const CBTerminalCell *)cellsForRow:(NSUInteger)row;
 - (CBTerminalContentMetrics)contentMetrics;
+- (BOOL)hasVisibleContent;
 - (void)showStatusMessage:(NSString *)message;
 
 @end
@@ -527,6 +528,11 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     }
 
     return metrics;
+}
+
+- (BOOL)hasVisibleContent
+{
+    return !CGRectIsEmpty([self contentMetrics].contentBounds);
 }
 
 - (void)showStatusMessage:(NSString *)message
@@ -970,6 +976,14 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [super stopAnimation];
 }
 
+- (void)viewWillMoveToWindow:(NSWindow *)newWindow
+{
+    if (newWindow == nil) {
+        [self stopCbonsaiProcess];
+    }
+    [super viewWillMoveToWindow:newWindow];
+}
+
 - (void)drawRect:(NSRect)rect
 {
     [[NSColor blackColor] setFill];
@@ -1324,7 +1338,7 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     pid_t waitResult = waitpid(childProcessIdentifier, &status, WNOHANG);
 
     if (!self.stoppingChildProcess) {
-        if (!self.childProcessProducedOutput) {
+        if (!self.childProcessProducedOutput || ![self.terminalBuffer hasVisibleContent]) {
             [self.terminalBuffer showStatusMessage:CBStatusMessageForWaitResult(waitResult, status)];
         }
         [self setNeedsDisplay:YES];
