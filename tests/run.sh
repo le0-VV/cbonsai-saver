@@ -140,18 +140,18 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.2' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.2x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.2x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
+if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.5' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.5.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
   echo "CI release build should package the current release version for arm64 and x86_64." >&2
   exit 1
 fi
 
-if ! grep -Fq 'brew_packages: ncurses pkgconf' "$CI_WORKFLOW_PATH" || ! grep -Fq 'brew_packages: pkgconf' "$CI_WORKFLOW_PATH"; then
-  echo "CI should install Homebrew ncurses only for the arm64 cask artifact." >&2
+if grep -Fq 'brew_packages: ncurses' "$CI_WORKFLOW_PATH" || ! grep -Fq 'brew_packages: pkgconf' "$CI_WORKFLOW_PATH"; then
+  echo "CI should install build tooling only; bundled ncurses must be source-built for release artifacts." >&2
   exit 1
 fi
 
 if ! grep -Fq 'releases/download/#{version}/cbonsai-saver-#{version}.zip' "$CASK_PATH"; then
-  echo "Homebrew cask should install the 1.1.2 release zip." >&2
+  echo "Homebrew cask should install the versioned release zip." >&2
   exit 1
 fi
 
@@ -160,14 +160,18 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "6f3bf630d78abfd26faa6e029db4987c1aa4546076f725d42c2804116fc8eb1d"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.2 release SHA-256." >&2
+if ! grep -Fq 'version "1.1.5"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.5 arm64 release." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'sha256 "18046612d08d277e5a9d4a3b7c455fc1c518443f525f73b5e353cc91922fd079"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.5 release SHA-256." >&2
   exit 1
 fi
 
 for cask_text in \
   'cask "cbonsai-saver" do' \
-  'version "1.1.2"' \
   'depends_on arch: :arm64' \
   'depends_on macos: :big_sur' \
   'screen_saver "cbonsai saver.saver"' \
@@ -194,9 +198,9 @@ fi
 for intel_release_doc_text in \
   'The cask is Apple Silicon only' \
   'cbonsai-saver-<version>-x86_64-macos10.15.zip' \
-  './scripts/package-release.sh 1.1.2 arm64' \
-  './scripts/package-release.sh 1.1.2x x86_64' \
-  'build/release/artifacts/cbonsai-saver-1.1.2x-x86_64-macos10.15.zip' \
+  './scripts/package-release.sh 1.1.5 arm64' \
+  './scripts/package-release.sh 1.1.4x x86_64' \
+  'build/release/artifacts/cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' \
   'The `x` suffix is only for the manual Intel release version.'
 do
   if ! grep -Fq "$intel_release_doc_text" "$HOMEBREW_DOC_PATH" "$README_PATH"; then
@@ -215,7 +219,10 @@ for ncurses_source_text in \
   'archive_sha256="355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11"' \
   'url="https://ftpmirror.gnu.org/gnu/ncurses/ncurses-${version}.tar.gz"' \
   'prefix="$(pwd)/build/release/deps/ncurses/${release_arch}-macos${deployment_target}"' \
-  'Source-built ncurses is only supported for x86_64 releases.' \
+  'arm64|x86_64)' \
+  '10.15|11.5)' \
+  'Unsupported ncurses release architecture' \
+  'Unsupported ncurses deployment target' \
   'ncurses source archive contains unexpected paths.' \
   'ncurses source archive contains unsafe paths.' \
   'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
@@ -238,13 +245,14 @@ for source_hardening_text in \
   'PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"' \
   'release_arch="${1:-$(uname -m)}"' \
   'deployment_target="${2:-}"' \
+  '""|10.15|11.5)' \
   'release_profile="${release_profile}-macos${deployment_target}"' \
   'PKG_CONFIG_PATH=""' \
   'CBONSAI_NCURSES_PKG_CONFIG_PATH' \
   'build/release/deps/ncurses/*/lib/pkgconfig' \
   'Unsupported cbonsai ncurses pkg-config path' \
   'Unable to find $release_arch ncurses pkg-config metadata for deployment target' \
-  'x86_64 macOS 10.15 releases must use source-built ncurses.' \
+  '${release_arch} macOS ${deployment_target} releases must use source-built ncurses.' \
   'cbonsai source archive contains unexpected paths.' \
   'cbonsai source archive contains unsafe paths.' \
   'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
@@ -275,7 +283,10 @@ done
 
 for release_hardening_text in \
   'Invalid release version' \
+  'version="${1:-1.1.5}"' \
   'Unsupported release architecture' \
+  'deployment_target="11.5"' \
+  'release_profile="arm64-macos${deployment_target}"' \
   'release_profile="x86_64-macos${deployment_target}"' \
   'archive_name="cbonsai-saver-${version}-${release_profile}.zip"' \
   'NCURSES_PREFIX="$(./scripts/build-ncurses-source.sh "$release_arch" "$deployment_target")"' \

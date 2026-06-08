@@ -37,14 +37,14 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            release_version: 1.1.2
+            release_version: 1.1.5
             runner: macos-15
-            artifact: cbonsai-saver-1.1.2.zip
-            brew_packages: ncurses pkgconf
+            artifact: cbonsai-saver-1.1.5.zip
+            brew_packages: pkgconf
           - arch: x86_64
-            release_version: 1.1.2x
+            release_version: 1.1.4x
             runner: macos-15-intel
-            artifact: cbonsai-saver-1.1.2x-x86_64-macos10.15.zip
+            artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip
             brew_packages: pkgconf
     steps:
       - name: Check out repository
