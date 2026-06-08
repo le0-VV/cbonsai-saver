@@ -18,7 +18,7 @@ case "$release_arch" in
 esac
 
 case "$deployment_target" in
-  ""|10.15)
+  ""|10.15|11.5)
     ;;
   *)
     echo "Unsupported cbonsai deployment target: $deployment_target" >&2
@@ -147,12 +147,12 @@ if [ -z "$PKG_CONFIG_PATH" ]; then
   exit 1
 fi
 
-if [ "$release_arch" = x86_64 ] && [ "$deployment_target" = 10.15 ]; then
+if [ -n "$deployment_target" ]; then
   case "$PKG_CONFIG_PATH" in
-    "$(pwd)"/build/release/deps/ncurses/x86_64-macos10.15/lib/pkgconfig)
+    "$(pwd)"/build/release/deps/ncurses/${release_arch}-macos${deployment_target}/lib/pkgconfig)
       ;;
     *)
-      echo "x86_64 macOS 10.15 releases must use source-built ncurses." >&2
+      echo "${release_arch} macOS ${deployment_target} releases must use source-built ncurses." >&2
       exit 1
       ;;
   esac

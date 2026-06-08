@@ -6,7 +6,7 @@ export PATH
 
 cd "$(dirname "$0")/.."
 
-version="${1:-1.1.2}"
+version="${1:-1.1.5}"
 release_arch="${2:-arm64}"
 repo_root="$(pwd)"
 project="cbonsai saver/cbonsai saver.xcodeproj"
@@ -15,8 +15,8 @@ configuration="Release"
 
 case "$release_arch" in
   arm64)
-    release_profile="arm64"
-    deployment_target=""
+    deployment_target="11.5"
+    release_profile="arm64-macos${deployment_target}"
     archive_name="cbonsai-saver-${version}.zip"
     ;;
   x86_64)
@@ -129,11 +129,9 @@ sign_screen_saver_bundle()
   fi
 }
 
-if [ "$release_arch" = x86_64 ]; then
-  NCURSES_PREFIX="$(./scripts/build-ncurses-source.sh "$release_arch" "$deployment_target")"
-  CBONSAI_NCURSES_PKG_CONFIG_PATH="${NCURSES_PREFIX}/lib/pkgconfig"
-  export CBONSAI_NCURSES_PKG_CONFIG_PATH
-fi
+NCURSES_PREFIX="$(./scripts/build-ncurses-source.sh "$release_arch" "$deployment_target")"
+CBONSAI_NCURSES_PKG_CONFIG_PATH="${NCURSES_PREFIX}/lib/pkgconfig"
+export CBONSAI_NCURSES_PKG_CONFIG_PATH
 
 CBONSAI_BINARY_PATH="$(./scripts/build-cbonsai-source.sh "$release_arch" "$deployment_target")"
 export CBONSAI_BINARY_PATH
@@ -143,30 +141,17 @@ if [ "$CBONSAI_BINARY_PATH" != "${repo_root}/build/upstream/${release_profile}/c
   exit 1
 fi
 
-if [ -n "$deployment_target" ]; then
-  xcodebuild \
-    -project "$project" \
-    -scheme "$scheme" \
-    -configuration "$configuration" \
-    -destination "platform=macOS,arch=${release_arch}" \
-    -derivedDataPath "$derived_data" \
-    ARCHS="$release_arch" \
-    ONLY_ACTIVE_ARCH=YES \
-    MACOSX_DEPLOYMENT_TARGET="$deployment_target" \
-    CODE_SIGNING_ALLOWED=NO \
-    build
-else
-  xcodebuild \
-    -project "$project" \
-    -scheme "$scheme" \
-    -configuration "$configuration" \
-    -destination "platform=macOS,arch=${release_arch}" \
-    -derivedDataPath "$derived_data" \
-    ARCHS="$release_arch" \
-    ONLY_ACTIVE_ARCH=YES \
-    CODE_SIGNING_ALLOWED=NO \
-    build
-fi
+xcodebuild \
+  -project "$project" \
+  -scheme "$scheme" \
+  -configuration "$configuration" \
+  -destination "platform=macOS,arch=${release_arch}" \
+  -derivedDataPath "$derived_data" \
+  ARCHS="$release_arch" \
+  ONLY_ACTIVE_ARCH=YES \
+  MACOSX_DEPLOYMENT_TARGET="$deployment_target" \
+  CODE_SIGNING_ALLOWED=NO \
+  build
 
 if [ ! -d "$product" ]; then
   echo "Missing built screen saver bundle: $product" >&2

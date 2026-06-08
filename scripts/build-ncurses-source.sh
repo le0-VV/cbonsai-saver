@@ -10,19 +10,28 @@ release_arch="${1:-x86_64}"
 deployment_target="${2:-10.15}"
 
 case "$release_arch" in
-  x86_64)
+  arm64|x86_64)
     ;;
   *)
-    echo "Source-built ncurses is only supported for x86_64 releases." >&2
+    echo "Unsupported ncurses release architecture: $release_arch" >&2
     exit 1
     ;;
 esac
 
 case "$deployment_target" in
-  10.15)
+  10.15|11.5)
     ;;
   *)
     echo "Unsupported ncurses deployment target: $deployment_target" >&2
+    exit 1
+    ;;
+esac
+
+case "${release_arch}:${deployment_target}" in
+  arm64:11.5|x86_64:10.15)
+    ;;
+  *)
+    echo "Unsupported ncurses release profile: ${release_arch} macOS ${deployment_target}." >&2
     exit 1
     ;;
 esac
