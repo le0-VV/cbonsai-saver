@@ -15,7 +15,9 @@ archive from the GitHub release page and install `cbonsai saver.saver` manually
 into `~/Library/Screen Savers`.
 
 The cask postflight removes Homebrew's quarantine attribute from the installed
-screen saver bundle. If macOS still blocks a local development build, run:
+screen saver bundle and asks macOS to relaunch the legacy screen saver host so
+upgrades do not keep running a stale loaded bundle. If macOS still blocks a
+local development build, run:
 
 ```sh
 xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbonsai saver.saver"
@@ -26,11 +28,11 @@ xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbonsai saver.saver"
 Build the release asset before drafting or publishing a GitHub release:
 
 ```sh
-./scripts/package-release.sh 1.1.5 arm64
+./scripts/package-release.sh 1.1.6 arm64
 ./scripts/package-release.sh 1.1.4x x86_64
 ```
 
-The arm64 build writes `build/release/artifacts/cbonsai-saver-1.1.5.zip`; this
+The arm64 build writes `build/release/artifacts/cbonsai-saver-1.1.6.zip`; this
 is the Homebrew cask asset. The x86_64 build writes
 `build/release/artifacts/cbonsai-saver-1.1.4x-x86_64-macos10.15.zip` for manual
 Intel Mac installs. Both commands print SHA-256 values. The cask URL and

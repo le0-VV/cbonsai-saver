@@ -33,6 +33,7 @@ PROJECT_PATH="cbonsai saver/cbonsai saver.xcodeproj/project.pbxproj"
 BUNDLE_SCRIPT_PATH="scripts/bundle-cbonsai.sh"
 BUILD_SOURCE_SCRIPT_PATH="scripts/build-cbonsai-source.sh"
 BUILD_NCURSES_SCRIPT_PATH="scripts/build-ncurses-source.sh"
+CBONSAI_PATCH_PATH="patches/cbonsai-v1.4.2-saver-noninteractive.patch"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
 LAUNCH_VERIFY_SCRIPT_PATH="scripts/verify-bundled-cbonsai-launch.sh"
 CI_WORKFLOW_PATH=".github/workflows/ci.yml"
@@ -95,6 +96,11 @@ if [ ! -f "$CI_WORKFLOW_PATH" ]; then
   exit 1
 fi
 
+if [ ! -f "$CBONSAI_PATCH_PATH" ]; then
+  echo "Missing local cbonsai saver runtime patch: $CBONSAI_PATCH_PATH" >&2
+  exit 1
+fi
+
 if grep -Fq 'actions/checkout@v4' "$CI_WORKFLOW_PATH"; then
   echo "GitHub Actions checkout should be pinned to a commit SHA." >&2
   exit 1
@@ -140,7 +146,7 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.5' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.5.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
+if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.6' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.6.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
   echo "CI release build should package the current release version for arm64 and x86_64." >&2
   exit 1
 fi
@@ -160,13 +166,13 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'version "1.1.5"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.5 arm64 release." >&2
+if ! grep -Fq 'version "1.1.6"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.6 arm64 release." >&2
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "18046612d08d277e5a9d4a3b7c455fc1c518443f525f73b5e353cc91922fd079"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.5 release SHA-256." >&2
+if ! grep -Fq 'sha256 "881ca1a790857166f499d1c60fd55bb5d24df477a2c0703915761de14efc99a0"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.6 release SHA-256." >&2
   exit 1
 fi
 
@@ -177,6 +183,9 @@ for cask_text in \
   'screen_saver "cbonsai saver.saver"' \
   'system_command "/usr/bin/xattr"' \
   'args: ["-dr", "com.apple.quarantine", installed_saver.to_s]' \
+  'system_command "/usr/bin/killall"' \
+  'args: ["legacyScreenSaver"]' \
+  'must_succeed: false' \
   '~/Library/Screen Savers/cbonsai saver.saver'
 do
   if ! grep -Fq "$cask_text" "$CASK_PATH"; then
@@ -198,7 +207,7 @@ fi
 for intel_release_doc_text in \
   'The cask is Apple Silicon only' \
   'cbonsai-saver-<version>-x86_64-macos10.15.zip' \
-  './scripts/package-release.sh 1.1.5 arm64' \
+  './scripts/package-release.sh 1.1.6 arm64' \
   './scripts/package-release.sh 1.1.4x x86_64' \
   'build/release/artifacts/cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' \
   'The `x` suffix is only for the manual Intel release version.'
@@ -257,11 +266,28 @@ for source_hardening_text in \
   'cbonsai source archive contains unsafe paths.' \
   'MACOSX_DEPLOYMENT_TARGET="$deployment_target"' \
   'CC="$compiler -arch $release_arch"' \
+  'cbonsai_patch="patches/cbonsai-v1.4.2-saver-noninteractive.patch"' \
+  'patch -d "$source_dir" -p1 < "$cbonsai_patch" >&2' \
+  '-DCBONSAI_SAVER_NONINTERACTIVE=1' \
   'Built cbonsai has minimum macOS' \
   'lipo -archs "$binary"'
 do
-  if ! grep -Fq "$source_hardening_text" "$BUILD_SOURCE_SCRIPT_PATH"; then
+  if ! grep -Fq -- "$source_hardening_text" "$BUILD_SOURCE_SCRIPT_PATH"; then
     echo "Missing verified-source hardening text: $source_hardening_text" >&2
+    exit 1
+  fi
+done
+
+for cbonsai_patch_text in \
+  'CBONSAI_SAVER_NONINTERACTIVE' \
+  'checkKeyPress' \
+  'cbreak();' \
+  'nodelay(stdscr, TRUE);' \
+  'updateScreen(conf.timeWait);' \
+  'wgetch(objects.treeWin)'
+do
+  if ! grep -Fq "$cbonsai_patch_text" "$CBONSAI_PATCH_PATH"; then
+    echo "Missing local cbonsai noninteractive patch text: $cbonsai_patch_text" >&2
     exit 1
   fi
 done
@@ -283,7 +309,7 @@ done
 
 for release_hardening_text in \
   'Invalid release version' \
-  'version="${1:-1.1.5}"' \
+  'version="${1:-1.1.6}"' \
   'Unsupported release architecture' \
   'deployment_target="11.5"' \
   'release_profile="arm64-macos${deployment_target}"' \
@@ -424,9 +450,11 @@ for pty_identity_text in \
   'dprintf(STDERR_FILENO, "cbonsai exec failed: %s\n", strerror(execError));' \
   '@"TERMINFO_DIRS=/usr/share/terminfo"' \
   'self.childProcessProducedOutput = YES;' \
-  'if (!self.childProcessProducedOutput)' \
+  'hasVisibleContent' \
+  'if (!self.childProcessProducedOutput || ![self.terminalBuffer hasVisibleContent])' \
   'CBStatusMessageForWaitResult(waitResult, status)' \
-  'cbonsai exited with status %d.'
+  'cbonsai exited with status %d.' \
+  'viewWillMoveToWindow:(NSWindow *)newWindow'
 do
   if ! grep -Fq "$pty_identity_text" "$VIEW_PATH"; then
     echo "PTY callbacks should be scoped to the cbonsai process that produced them: $pty_identity_text" >&2

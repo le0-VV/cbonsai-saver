@@ -1,6 +1,6 @@
 cask "cbonsai-saver" do
-  version "1.1.5"
-  sha256 "18046612d08d277e5a9d4a3b7c455fc1c518443f525f73b5e353cc91922fd079"
+  version "1.1.6"
+  sha256 "881ca1a790857166f499d1c60fd55bb5d24df477a2c0703915761de14efc99a0"
 
   url "https://github.com/le0-VV/cbonsai-saver/releases/download/#{version}/cbonsai-saver-#{version}.zip",
       verified: "github.com/le0-VV/cbonsai-saver/"
@@ -17,6 +17,9 @@ cask "cbonsai-saver" do
     installed_saver = Pathname.new(cask.config.screen_saverdir).expand_path/"cbonsai saver.saver"
     system_command "/usr/bin/xattr",
                    args: ["-dr", "com.apple.quarantine", installed_saver.to_s]
+    system_command "/usr/bin/killall",
+                   args: ["legacyScreenSaver"],
+                   must_succeed: false
   end
 
   zap trash: [

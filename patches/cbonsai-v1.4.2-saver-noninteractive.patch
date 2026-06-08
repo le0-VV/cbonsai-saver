@@ -1,0 +1,54 @@
+--- a/cbonsai.c
++++ b/cbonsai.c
+@@ -245,11 +245,15 @@ void roll(int *dice, int mod) { *dice = rand() % mod; }
+ 
+ // check for key press
+ int checkKeyPress(const struct config *conf, struct counters *myCounters) {
++#ifdef CBONSAI_SAVER_NONINTERACTIVE
++	return 0;
++#else
+ 	if ((conf->screensaver && wgetch(stdscr) != ERR) || (wgetch(stdscr) == 'q')) {
+ 		finish(conf, myCounters);
+ 		return 1;
+ 	}
+ 	return 0;
++#endif
+ }
+ 
+ // display changes
+@@ -647,8 +651,10 @@ void init(const struct config *conf, struct ncursesObjects *objects) {
+ 	initscr();	// init ncurses screen
+ 	noecho();	// don't echo input to screen
+ 	curs_set(0);	// make cursor invisible
++#ifndef CBONSAI_SAVER_NONINTERACTIVE
+ 	cbreak();	// don't wait for new line to grab user input
+ 	nodelay(stdscr, TRUE);	// force getch to be a non-blocking call
++#endif
+ 
+ 	// if terminal has color capabilities, use them
+ 	if (has_colors()) {
+@@ -1068,10 +1074,14 @@ int main(int argc, char* argv[]) {
+ 		growTree(&conf, &objects, &myCounters);
+ 		if (conf.load) conf.targetBranchCount = 0;
+ 		if (conf.infinite) {
++#ifdef CBONSAI_SAVER_NONINTERACTIVE
++			updateScreen(conf.timeWait);
++#else
+ 			timeout(conf.timeWait * 1000);
+ 			if (checkKeyPress(&conf, &myCounters) == 1)
+ 				quit(&conf, &objects, 0);
++#endif
+ 
+ 			// seed random number generator
+ 			srand(time(NULL));
+ 		}
+@@ -1089,7 +1099,9 @@ int main(int argc, char* argv[]) {
+ 
+ 		printstdscr();
+ 	} else {
++#ifndef CBONSAI_SAVER_NONINTERACTIVE
+ 		wgetch(objects.treeWin);
++#endif
+ 		finish(&conf, &myCounters);
+ 	}
+ 
