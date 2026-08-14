@@ -1599,6 +1599,13 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     [self setToolTip:@"Print extra output." forViews:@[self.verboseButton]];
     [self addHelpButtonForAnchor:@"verbose" toView:advancedView frame:NSMakeRect(labelX + 184.0, advancedY, CBHelpButtonSize, CBHelpButtonSize)];
 
+    NSButton *restoreDefaultsButton = [[NSButton alloc] initWithFrame:NSMakeRect(20, 18, 130, 30)];
+    restoreDefaultsButton.title = @"Restore Defaults";
+    restoreDefaultsButton.bezelStyle = NSBezelStyleRounded;
+    restoreDefaultsButton.target = self;
+    restoreDefaultsButton.action = @selector(restoreDefaultConfiguration:);
+    [contentView addSubview:restoreDefaultsButton];
+
     NSButton *cancelButton = [[NSButton alloc] initWithFrame:NSMakeRect(CBConfigurationSheetWidth - 220, 18, 90, 30)];
     cancelButton.title = @"Cancel";
     cancelButton.bezelStyle = NSBezelStyleRounded;
@@ -1736,8 +1743,11 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
 
 - (void)loadConfigurationFields
 {
-    NSDictionary<NSString *, id> *options = self.configuredCbonsaiOptions;
+    [self loadConfigurationFieldsFromOptions:self.configuredCbonsaiOptions];
+}
 
+- (void)loadConfigurationFieldsFromOptions:(NSDictionary<NSString *, id> *)options
+{
     [self setDoubleField:self.timeField stepper:self.timeStepper value:[self doubleOption:options key:CBCbonsaiTimeKey]];
     [self setDoubleField:self.waitField stepper:self.waitStepper value:[self doubleOption:options key:CBCbonsaiWaitKey]];
     self.messageField.stringValue = [self stringOption:options key:CBCbonsaiMessageKey];
@@ -1751,6 +1761,11 @@ typedef NS_ENUM(NSUInteger, CBParserState) {
     self.seedField.stringValue = [NSString stringWithFormat:@"%ld", (long)[self integerOption:options key:CBCbonsaiSeedKey]];
     self.verboseButton.state = [self boolOption:options key:CBCbonsaiVerboseKey] ? NSControlStateValueOn : NSControlStateValueOff;
     [self updateOptionalFieldStates];
+}
+
+- (void)restoreDefaultConfiguration:(id)sender
+{
+    [self loadConfigurationFieldsFromOptions:CBDefaultCbonsaiOptions()];
 }
 
 - (void)saveConfiguration:(id)sender

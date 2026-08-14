@@ -40,6 +40,21 @@ int main(void)
     @autoreleasepool {
         CBAssert([CBDefaultEnvironmentPath() isEqualToString:@"/usr/bin:/bin:/usr/sbin:/sbin"], @"Default PATH should only include system directories.");
 
+        CBAssert([CBDefaultCbonsaiOptions() isEqualToDictionary:@{
+            CBCbonsaiTimeKey: @0.03,
+            CBCbonsaiWaitKey: @3.0,
+            CBCbonsaiMessageKey: @"",
+            CBCbonsaiBaseEnabledKey: @YES,
+            CBCbonsaiBaseKey: @1,
+            CBCbonsaiLeafKey: @"&",
+            CBCbonsaiColorKey: @"2,3,10,11",
+            CBCbonsaiMultiplierKey: @5,
+            CBCbonsaiLifeKey: @32,
+            CBCbonsaiSeedEnabledKey: @NO,
+            CBCbonsaiSeedKey: @0,
+            CBCbonsaiVerboseKey: @NO,
+        }], @"Restore Defaults should use the complete canonical cbonsai configuration.");
+
         CBAssertArguments(@{}, (@[
             @"--live",
             @"--infinite",

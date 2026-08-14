@@ -507,6 +507,17 @@ if ! grep -Fq 'NSTabView' "$VIEW_PATH" || ! grep -Fq 'advancedTab.label = @"Adva
   exit 1
 fi
 
+for restore_defaults_text in \
+  'restoreDefaultsButton.title = @"Restore Defaults";' \
+  'restoreDefaultsButton.action = @selector(restoreDefaultConfiguration:);' \
+  '[self loadConfigurationFieldsFromOptions:CBDefaultCbonsaiOptions()];'
+do
+  if ! grep -Fq "$restore_defaults_text" "$VIEW_PATH"; then
+    echo "Restore Defaults should reload the canonical configuration: $restore_defaults_text" >&2
+    exit 1
+  fi
+done
+
 if grep -Eq 'add(Label|Checkbox):@"[^"]*\(--' "$VIEW_PATH"; then
   echo "Visible setting labels should not expose command-line flags." >&2
   exit 1
