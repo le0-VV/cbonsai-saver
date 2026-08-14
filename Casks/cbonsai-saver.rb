@@ -8,6 +8,11 @@ cask "cbonsai-saver" do
   desc "macOS screen saver that runs bundled cbonsai"
   homepage "https://github.com/le0-VV/cbonsai-saver"
 
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
   depends_on arch: :arm64
   depends_on macos: :big_sur
 

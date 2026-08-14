@@ -38,6 +38,20 @@ is the Homebrew cask asset. The x86_64 build writes
 Intel Mac installs. Both commands print SHA-256 values. The cask URL and
 SHA-256 must match the uploaded arm64 GitHub release asset.
 
+Publishing a stable release whose tag is a three-part numeric version, such as
+`1.2.3`, triggers `.github/workflows/update-homebrew-cask.yml`. The workflow
+downloads the exact `cbonsai-saver-<version>.zip` asset, calculates its SHA-256,
+checks any digest reported by GitHub, updates the cask and aligned arm64 release
+metadata, and runs the local test suite. It then creates a GitHub-signed commit
+on an `automation/homebrew-<version>` branch, opens a ready pull request, and
+dispatches CI explicitly for that branch. Pre-releases, draft releases, manual
+Intel `x` releases, malformed versions, missing or duplicate assets, checksum
+disagreements, downgrades, and retagged versions fail without changing the tap.
+
+The repository must allow GitHub Actions to create pull requests. The workflow
+does not push directly to protected `main`, approve its own pull request, or
+merge automatically.
+
 The `x` suffix is only for the manual Intel release version. Do not use it for
 the Apple Silicon Homebrew cask version.
 

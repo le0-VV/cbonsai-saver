@@ -1,0 +1,194 @@
+name: Update Homebrew cask
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: homebrew-cask-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: ${{ github.event.release.draft == false && github.event.release.prerelease == false }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Validate release asset and checksum
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -eu
+
+          version="$RELEASE_TAG"
+          if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Refusing non-stable Homebrew release tag: $version" >&2
+            exit 1
+          fi
+
+          asset_name="cbonsai-saver-${version}.zip"
+          asset_count="$(jq --arg name "$asset_name" '[.release.assets[] | select(.name == $name)] | length' "$GITHUB_EVENT_PATH")"
+          if [ "$asset_count" -ne 1 ]; then
+            echo "Expected exactly one release asset named $asset_name; found $asset_count." >&2
+            exit 1
+          fi
+
+          asset_url="$(jq -r --arg name "$asset_name" '.release.assets[] | select(.name == $name) | .browser_download_url' "$GITHUB_EVENT_PATH")"
+          recorded_digest="$(jq -r --arg name "$asset_name" '.release.assets[] | select(.name == $name) | (.digest // "")' "$GITHUB_EVENT_PATH")"
+          expected_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${version}/${asset_name}"
+          if [ "$asset_url" != "$expected_url" ]; then
+            echo "Unexpected release asset URL: $asset_url" >&2
+            exit 1
+          fi
+
+          archive="${RUNNER_TEMP}/${asset_name}"
+          curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" "$asset_url"
+          sha256="$(sha256sum "$archive" | awk '{ print $1 }')"
+          if [ -n "$recorded_digest" ] && [ "$recorded_digest" != "sha256:${sha256}" ]; then
+            echo "GitHub asset digest mismatch: got $recorded_digest, calculated sha256:$sha256" >&2
+            exit 1
+          fi
+
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'sha256=%s\n' "$sha256" >> "$GITHUB_OUTPUT"
+          printf 'asset_name=%s\n' "$asset_name" >> "$GITHUB_OUTPUT"
+
+      - name: Update and validate release metadata
+        id: update
+        env:
+          RELEASE_SHA256: ${{ steps.release.outputs.sha256 }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -eu
+
+          ./scripts/update-homebrew-cask.rb "$RELEASE_VERSION" "$RELEASE_SHA256"
+          ruby -c Casks/cbonsai-saver.rb
+          ruby -c scripts/update-homebrew-cask.rb
+          ./tests/run.sh
+          git diff --check
+
+          changed_files="$(git diff --name-only | sort)"
+          if [ -z "$changed_files" ]; then
+            echo "Homebrew release metadata is already current."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          expected_files="$(printf '%s\n' \
+            .github/workflows/ci.yml \
+            Casks/cbonsai-saver.rb \
+            HOMEBREW.md \
+            scripts/package-release.sh | sort)"
+          if [ "$changed_files" != "$expected_files" ]; then
+            echo "Unexpected automatic release metadata changes:" >&2
+            printf '%s\n' "$changed_files" >&2
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub-signed update commit and pull request
+        if: ${{ steps.update.outputs.changed == 'true' }}
+        env:
+          ASSET_NAME: ${{ steps.release.outputs.asset_name }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA256: ${{ steps.release.outputs.sha256 }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -eu
+
+          branch="automation/homebrew-${RELEASE_VERSION}"
+          existing_pr="$(gh pr list --repo "$GITHUB_REPOSITORY" --state all --head "$branch" --json url --jq '.[0].url // empty')"
+          if [ -n "$existing_pr" ]; then
+            echo "Homebrew update pull request already exists: $existing_pr"
+            exit 0
+          fi
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing branch without a pull request: $branch" >&2
+            exit 1
+          fi
+
+          base_branch="$BASE_BRANCH"
+          base_oid="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${base_branch}" --jq '.object.sha')"
+          checkout_oid="$(git rev-parse HEAD)"
+          if [ "$checkout_oid" != "$base_oid" ]; then
+            echo "Default branch changed during the update; rerun against the new head." >&2
+            exit 1
+          fi
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/heads/${branch}" \
+            -f sha="$base_oid" >/dev/null
+
+          additions='[]'
+          for path in \
+            .github/workflows/ci.yml \
+            Casks/cbonsai-saver.rb \
+            HOMEBREW.md \
+            scripts/package-release.sh
+          do
+            contents="$(base64 < "$path" | tr -d '\n')"
+            additions="$(jq --arg path "$path" --arg contents "$contents" '. + [{path: $path, contents: $contents}]' <<< "$additions")"
+          done
+
+          query='mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid url } } }'
+          payload="${RUNNER_TEMP}/create-homebrew-commit.json"
+          jq -n \
+            --arg query "$query" \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg branch "$branch" \
+            --arg expected_head_oid "$base_oid" \
+            --arg headline "chore(homebrew): update cask for ${RELEASE_VERSION}" \
+            --argjson additions "$additions" \
+            '{query: $query, variables: {input: {branch: {repositoryNameWithOwner: $repository, branchName: $branch}, expectedHeadOid: $expected_head_oid, message: {headline: $headline}, fileChanges: {additions: $additions}}}}' \
+            > "$payload"
+
+          commit_response="$(gh api graphql --input "$payload")"
+          commit_oid="$(printf '%s\n' "$commit_response" | jq -r '.data.createCommitOnBranch.commit.oid')"
+          if [ -z "$commit_oid" ] || [ "$commit_oid" = "null" ]; then
+            echo "GitHub did not return the automatic update commit OID." >&2
+            exit 1
+          fi
+
+          verified="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${commit_oid}" --jq '.verification.verified')"
+          if [ "$verified" != "true" ]; then
+            echo "GitHub did not verify the automatic update commit signature." >&2
+            exit 1
+          fi
+
+          body="${RUNNER_TEMP}/homebrew-update-pr.md"
+          printf '%s\n' \
+            "## Summary" \
+            "" \
+            "- update the Homebrew cask to \`${RELEASE_VERSION}\`" \
+            "- set SHA-256 to \`${RELEASE_SHA256}\` for \`${ASSET_NAME}\`" \
+            "- align arm64 release metadata and maintenance documentation" \
+            "" \
+            "## Validation" \
+            "" \
+            "- downloaded the published release asset over HTTPS" \
+            "- recalculated SHA-256 and checked GitHub's recorded digest when present" \
+            "- ran \`ruby -c\`, \`./tests/run.sh\`, and \`git diff --check\`" \
+            "- created commit \`${commit_oid}\` through GitHub's signed-commit API" \
+            > "$body"
+
+          pr_url="$(gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base "$base_branch" \
+            --head "$branch" \
+            --title "chore(homebrew): update cask for ${RELEASE_VERSION}" \
+            --body-file "$body")"
+          echo "Created Homebrew update pull request: $pr_url"
+
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
