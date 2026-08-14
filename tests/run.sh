@@ -146,7 +146,7 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.6' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.6.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
+if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.7' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.7.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
   echo "CI release build should package the current release version for arm64 and x86_64." >&2
   exit 1
 fi
@@ -166,13 +166,13 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'version "1.1.6"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.6 arm64 release." >&2
+if ! grep -Fq 'version "1.1.7"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.7 arm64 release." >&2
   exit 1
 fi
 
-if ! grep -Fq 'sha256 "881ca1a790857166f499d1c60fd55bb5d24df477a2c0703915761de14efc99a0"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.6 release SHA-256." >&2
+if ! grep -Fq 'sha256 "174fc29a148d26c69a2a012e65862a1231c59300c5c4a6658b54cbaf91fb6bf5"' "$CASK_PATH"; then
+  echo "Homebrew cask should use the 1.1.7 release SHA-256." >&2
   exit 1
 fi
 
@@ -207,7 +207,7 @@ fi
 for intel_release_doc_text in \
   'The cask is Apple Silicon only' \
   'cbonsai-saver-<version>-x86_64-macos10.15.zip' \
-  './scripts/package-release.sh 1.1.6 arm64' \
+  './scripts/package-release.sh 1.1.7 arm64' \
   './scripts/package-release.sh 1.1.4x x86_64' \
   'build/release/artifacts/cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' \
   'The `x` suffix is only for the manual Intel release version.'
@@ -309,7 +309,7 @@ done
 
 for release_hardening_text in \
   'Invalid release version' \
-  'version="${1:-1.1.6}"' \
+  'version="${1:-1.1.7}"' \
   'Unsupported release architecture' \
   'deployment_target="11.5"' \
   'release_profile="arm64-macos${deployment_target}"' \

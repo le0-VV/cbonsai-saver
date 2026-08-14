@@ -6,7 +6,7 @@ export PATH
 
 cd "$(dirname "$0")/.."
 
-version="${1:-1.1.6}"
+version="${1:-1.1.7}"
 release_arch="${2:-arm64}"
 repo_root="$(pwd)"
 project="cbonsai saver/cbonsai saver.xcodeproj"

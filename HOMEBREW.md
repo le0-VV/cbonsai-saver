@@ -28,11 +28,11 @@ xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbonsai saver.saver"
 Build the release asset before drafting or publishing a GitHub release:
 
 ```sh
-./scripts/package-release.sh 1.1.6 arm64
+./scripts/package-release.sh 1.1.7 arm64
 ./scripts/package-release.sh 1.1.4x x86_64
 ```
 
-The arm64 build writes `build/release/artifacts/cbonsai-saver-1.1.6.zip`; this
+The arm64 build writes `build/release/artifacts/cbonsai-saver-1.1.7.zip`; this
 is the Homebrew cask asset. The x86_64 build writes
 `build/release/artifacts/cbonsai-saver-1.1.4x-x86_64-macos10.15.zip` for manual
 Intel Mac installs. Both commands print SHA-256 values. The cask URL and
