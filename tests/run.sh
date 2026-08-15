@@ -36,7 +36,9 @@ BUILD_NCURSES_SCRIPT_PATH="scripts/build-ncurses-source.sh"
 CBONSAI_PATCH_PATH="patches/cbonsai-v1.4.2-saver-noninteractive.patch"
 RELEASE_SCRIPT_PATH="scripts/package-release.sh"
 LAUNCH_VERIFY_SCRIPT_PATH="scripts/verify-bundled-cbonsai-launch.sh"
+HOMEBREW_UPDATE_SCRIPT_PATH="scripts/update-homebrew-cask.rb"
 CI_WORKFLOW_PATH=".github/workflows/ci.yml"
+HOMEBREW_UPDATE_WORKFLOW_PATH=".github/workflows/update-homebrew-cask.yml"
 CASK_PATH="Casks/cbonsai-saver.rb"
 HOMEBREW_DOC_PATH="HOMEBREW.md"
 README_PATH="README.md"
@@ -53,6 +55,7 @@ sh -n "$BUILD_SOURCE_SCRIPT_PATH"
 sh -n "$BUILD_NCURSES_SCRIPT_PATH"
 sh -n "$RELEASE_SCRIPT_PATH"
 sh -n "$LAUNCH_VERIFY_SCRIPT_PATH"
+ruby -c "$HOMEBREW_UPDATE_SCRIPT_PATH" >/dev/null
 
 if [ ! -f "$CASK_PATH" ]; then
   echo "Missing Homebrew cask: $CASK_PATH" >&2
@@ -93,6 +96,11 @@ fi
 
 if [ ! -f "$CI_WORKFLOW_PATH" ]; then
   echo "Missing GitHub Actions workflow: $CI_WORKFLOW_PATH" >&2
+  exit 1
+fi
+
+if [ ! -f "$HOMEBREW_UPDATE_WORKFLOW_PATH" ]; then
+  echo "Missing automatic Homebrew update workflow: $HOMEBREW_UPDATE_WORKFLOW_PATH" >&2
   exit 1
 fi
 
@@ -146,7 +154,18 @@ if ! grep -Fq 'Check Homebrew cask syntax' "$CI_WORKFLOW_PATH" || ! grep -Fq 'ru
   exit 1
 fi
 
-if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.6' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.6.zip' "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
+CASK_VERSION="$(sed -n 's/^  version "\([^"]*\)"$/\1/p' "$CASK_PATH")"
+CASK_SHA256="$(sed -n 's/^  sha256 "\([0-9a-f]*\)"$/\1/p' "$CASK_PATH")"
+if ! printf '%s\n' "$CASK_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "Homebrew cask should contain one stable three-part numeric version." >&2
+  exit 1
+fi
+if ! printf '%s\n' "$CASK_SHA256" | grep -Eq '^[0-9a-f]{64}$'; then
+  echo "Homebrew cask should contain one lowercase SHA-256." >&2
+  exit 1
+fi
+
+if ! grep -Fq './scripts/package-release.sh "${{ matrix.release_version }}" "${{ matrix.arch }}"' "$CI_WORKFLOW_PATH" || ! grep -Fq "release_version: $CASK_VERSION" "$CI_WORKFLOW_PATH" || ! grep -Fq "artifact: cbonsai-saver-$CASK_VERSION.zip" "$CI_WORKFLOW_PATH" || ! grep -Fq 'release_version: 1.1.4x' "$CI_WORKFLOW_PATH" || ! grep -Fq 'artifact: cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' "$CI_WORKFLOW_PATH"; then
   echo "CI release build should package the current release version for arm64 and x86_64." >&2
   exit 1
 fi
@@ -166,18 +185,9 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
-if ! grep -Fq 'version "1.1.6"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.6 arm64 release." >&2
-  exit 1
-fi
-
-if ! grep -Fq 'sha256 "881ca1a790857166f499d1c60fd55bb5d24df477a2c0703915761de14efc99a0"' "$CASK_PATH"; then
-  echo "Homebrew cask should use the 1.1.6 release SHA-256." >&2
-  exit 1
-fi
-
 for cask_text in \
   'cask "cbonsai-saver" do' \
+  'strategy :github_latest' \
   'depends_on arch: :arm64' \
   'depends_on macos: :big_sur' \
   'screen_saver "cbonsai saver.saver"' \
@@ -207,13 +217,103 @@ fi
 for intel_release_doc_text in \
   'The cask is Apple Silicon only' \
   'cbonsai-saver-<version>-x86_64-macos10.15.zip' \
-  './scripts/package-release.sh 1.1.6 arm64' \
+  "./scripts/package-release.sh $CASK_VERSION arm64" \
   './scripts/package-release.sh 1.1.4x x86_64' \
+  "build/release/artifacts/cbonsai-saver-$CASK_VERSION.zip" \
   'build/release/artifacts/cbonsai-saver-1.1.4x-x86_64-macos10.15.zip' \
   'The `x` suffix is only for the manual Intel release version.'
 do
   if ! grep -Fq "$intel_release_doc_text" "$HOMEBREW_DOC_PATH" "$README_PATH"; then
     echo "Missing Intel release documentation: $intel_release_doc_text" >&2
+    exit 1
+  fi
+done
+
+for homebrew_automation_text in \
+  'types: [published]' \
+  'actions: write' \
+  'contents: write' \
+  'pull-requests: write' \
+  'runs-on: ubuntu-24.04' \
+  'persist-credentials: false' \
+  'ref: ${{ github.event.repository.default_branch }}' \
+  '^[0-9]+\.[0-9]+\.[0-9]+$' \
+  'Expected exactly one release asset named' \
+  "expected_url=\"https://github.com/\${GITHUB_REPOSITORY}/releases/download/\${version}/\${asset_name}\"" \
+  "curl --fail --location --proto '=https' --tlsv1.2" \
+  'GitHub asset digest mismatch' \
+  './scripts/update-homebrew-cask.rb "$RELEASE_VERSION" "$RELEASE_SHA256"' \
+  'changed=false' \
+  'createCommitOnBranch' \
+  'branchName: $branch' \
+  'verification.verified' \
+  'gh pr create' \
+  'gh workflow run ci.yml' \
+  'Refusing to overwrite existing branch without a pull request'
+do
+  if ! grep -Fq "$homebrew_automation_text" "$HOMEBREW_UPDATE_WORKFLOW_PATH"; then
+    echo "Missing automatic Homebrew update protection: $homebrew_automation_text" >&2
+    exit 1
+  fi
+done
+
+if grep -Eq 'uses: [^@]+@(main|master|v[0-9]+)$' "$HOMEBREW_UPDATE_WORKFLOW_PATH"; then
+  echo "Automatic Homebrew workflow actions must be pinned to commit SHAs." >&2
+  exit 1
+fi
+
+if "$HOMEBREW_UPDATE_SCRIPT_PATH" 1.2.3 not-a-sha256 >/dev/null 2>&1; then
+  echo "Automatic Homebrew updater should reject an invalid SHA-256." >&2
+  exit 1
+fi
+
+UPDATER_TEST_ROOT="$(mktemp -d "${BUILD_DIR}/homebrew-updater.XXXXXX")"
+mkdir -p "$UPDATER_TEST_ROOT/scripts" "$UPDATER_TEST_ROOT/Casks" "$UPDATER_TEST_ROOT/.github/workflows"
+cp "$HOMEBREW_UPDATE_SCRIPT_PATH" "$RELEASE_SCRIPT_PATH" "$UPDATER_TEST_ROOT/scripts/"
+cp "$CASK_PATH" "$UPDATER_TEST_ROOT/Casks/"
+cp "$CI_WORKFLOW_PATH" "$UPDATER_TEST_ROOT/.github/workflows/"
+cp "$HOMEBREW_DOC_PATH" "$UPDATER_TEST_ROOT/"
+UPDATER_TEST_VERSION="999.999.999"
+UPDATER_TEST_SHA256="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+"$UPDATER_TEST_ROOT/scripts/update-homebrew-cask.rb" "$UPDATER_TEST_VERSION" "$UPDATER_TEST_SHA256" >/dev/null
+"$UPDATER_TEST_ROOT/scripts/update-homebrew-cask.rb" "$UPDATER_TEST_VERSION" "$UPDATER_TEST_SHA256" >/dev/null
+
+for updater_result in \
+  "version \"$UPDATER_TEST_VERSION\"" \
+  "sha256 \"$UPDATER_TEST_SHA256\"" \
+  "version=\"\${1:-$UPDATER_TEST_VERSION}\"" \
+  "release_version: $UPDATER_TEST_VERSION" \
+  "artifact: cbonsai-saver-$UPDATER_TEST_VERSION.zip" \
+  "./scripts/package-release.sh $UPDATER_TEST_VERSION arm64" \
+  "build/release/artifacts/cbonsai-saver-$UPDATER_TEST_VERSION.zip"
+do
+  if ! grep -FRq "$updater_result" "$UPDATER_TEST_ROOT"; then
+    echo "Automatic Homebrew updater did not produce: $updater_result" >&2
+    exit 1
+  fi
+done
+
+if "$UPDATER_TEST_ROOT/scripts/update-homebrew-cask.rb" 1.0.0 "$UPDATER_TEST_SHA256" >/dev/null 2>&1; then
+  echo "Automatic Homebrew updater should reject a downgrade." >&2
+  exit 1
+fi
+if "$UPDATER_TEST_ROOT/scripts/update-homebrew-cask.rb" "$UPDATER_TEST_VERSION" bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb >/dev/null 2>&1; then
+  echo "Automatic Homebrew updater should reject a checksum change for an existing version." >&2
+  exit 1
+fi
+
+for homebrew_updater_text in \
+  'Invalid stable release version' \
+  'Invalid release SHA-256' \
+  'Refusing to downgrade cask' \
+  'Refusing checksum change for existing cask version' \
+  'Expected one' \
+  'scripts/package-release.sh' \
+  '.github/workflows/ci.yml' \
+  'HOMEBREW.md'
+do
+  if ! grep -Fq "$homebrew_updater_text" "$HOMEBREW_UPDATE_SCRIPT_PATH"; then
+    echo "Missing automatic Homebrew updater protection: $homebrew_updater_text" >&2
     exit 1
   fi
 done
@@ -309,7 +409,7 @@ done
 
 for release_hardening_text in \
   'Invalid release version' \
-  'version="${1:-1.1.6}"' \
+  "version=\"\${1:-$CASK_VERSION}\"" \
   'Unsupported release architecture' \
   'deployment_target="11.5"' \
   'release_profile="arm64-macos${deployment_target}"' \

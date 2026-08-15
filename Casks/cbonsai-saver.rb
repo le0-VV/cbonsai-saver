@@ -1,12 +1,17 @@
 cask "cbonsai-saver" do
-  version "1.1.6"
-  sha256 "881ca1a790857166f499d1c60fd55bb5d24df477a2c0703915761de14efc99a0"
+  version "1.1.7"
+  sha256 "174fc29a148d26c69a2a012e65862a1231c59300c5c4a6658b54cbaf91fb6bf5"
 
   url "https://github.com/le0-VV/cbonsai-saver/releases/download/#{version}/cbonsai-saver-#{version}.zip",
       verified: "github.com/le0-VV/cbonsai-saver/"
   name "cbonsai saver"
   desc "macOS screen saver that runs bundled cbonsai"
   homepage "https://github.com/le0-VV/cbonsai-saver"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
 
   depends_on arch: :arm64
   depends_on macos: :big_sur
