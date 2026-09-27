@@ -185,17 +185,24 @@ if grep -Fq 'sha256 "00000000000000000000000000000000000000000000000000000000000
   exit 1
 fi
 
+if grep -Fq 'verified:' "$CASK_PATH" || grep -Eq '^  postflight do$' "$CASK_PATH"; then
+  echo "Homebrew cask should not use deprecated URL verification or postflight DSL." >&2
+  exit 1
+fi
+
 for cask_text in \
   'cask "cbonsai-saver" do' \
+  'desc "Screen saver that runs bundled cbonsai"' \
   'strategy :github_latest' \
   'depends_on arch: :arm64' \
-  'depends_on macos: :big_sur' \
+  'depends_on :macos' \
+  'preflight_steps do' \
+  'run "/usr/bin/xattr"' \
+  'args:           ["-dr", "com.apple.quarantine", "{{staged_path}}/cbonsai saver.saver"]' \
+  'writable_paths: ["cbonsai saver.saver"]' \
   'screen_saver "cbonsai saver.saver"' \
-  'system_command "/usr/bin/xattr"' \
-  'args: ["-dr", "com.apple.quarantine", installed_saver.to_s]' \
-  'system_command "/usr/bin/killall"' \
-  'args: ["legacyScreenSaver"]' \
-  'must_succeed: false' \
+  'postflight_steps do' \
+  'terminate_process "legacyScreenSaver"' \
   '~/Library/Screen Savers/cbonsai saver.saver'
 do
   if ! grep -Fq "$cask_text" "$CASK_PATH"; then

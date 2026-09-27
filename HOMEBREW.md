@@ -14,10 +14,10 @@ users should download the `cbonsai-saver-<version>-x86_64-macos10.15.zip`
 archive from the GitHub release page and install `cbonsai saver.saver` manually
 into `~/Library/Screen Savers`.
 
-The cask postflight removes Homebrew's quarantine attribute from the installed
-screen saver bundle and asks macOS to relaunch the legacy screen saver host so
-upgrades do not keep running a stale loaded bundle. If macOS still blocks a
-local development build, run:
+The cask removes Homebrew's quarantine attribute from the staged screen saver
+bundle before installation and asks macOS to relaunch the legacy screen saver
+host so upgrades do not keep running a stale loaded bundle. If macOS still
+blocks a local development build, run:
 
 ```sh
 xattr -dr com.apple.quarantine "$HOME/Library/Screen Savers/cbonsai saver.saver"
